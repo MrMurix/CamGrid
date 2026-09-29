@@ -23,7 +23,8 @@ Cloud, kein Konto — alles läuft im eigenen Netz.
   Kacheln über mehrere Felder ziehen. Die Vorschau zeigt vorab, wie es auf dem
   Bildschirm aussieht.
 - **Bedienen ohne Handbuch** — Ziehen oder Antippen, Vorschaubilder überall,
-  Rückgängig, gespeichert wird erst auf Knopfdruck.
+  Rückgängig, Deutsch oder Englisch, hell oder dunkel; gespeichert wird erst auf
+  Knopfdruck.
 - **Läuft von allein** — Dienste starten mit dem System, eine Überwachung startet
   leere oder abgestürzte Anzeigefenster automatisch neu.
 - **Ohne Fremdsoftware** — kein Docker, keine Datenbank, keine Python-Pakete.

@@ -56,6 +56,7 @@
       <div class="zustand-leiste" id="zustandLeiste"></div>
       <div class="fuss-zeile">
         <span class="klein" id="kopfAdresse">wird geladen …</span>
+        <button class="knopf knopf-still" id="sprache" title="Sprache">DE</button>
         <button class="knopf knopf-still" id="thema" title="Helles oder dunkles Aussehen">
           <svg class="symbol"><use href="#sym-thema"/></svg></button>
       </div>
@@ -214,6 +215,11 @@
           <div class="karte">
             <h3>Anzeige</h3>
             <label class="feld">Name der Anlage <input type="text" id="setAnlage"></label>
+            <label class="feld">Sprache der Anzeigeseite
+              <select id="setSprache">
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+              </select></label>
             <div class="feld-paar">
               <label class="feld">Bildrate (Hz) <input type="number" id="setBildrate" min="24" max="120"></label>
               <label class="feld">Abstand (Pixel) <input type="number" id="setAbstand" min="0" max="60"></label>

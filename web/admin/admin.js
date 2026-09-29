@@ -10,6 +10,8 @@
       nur dessen Kennung. Sonst zeigen die Kacheln nach einem Speichern auf
       alte Objekte und Änderungen gehen verloren. */
 
+import { t, baumUebersetzen, spracheHolen, spracheSetzen } from "./sprache.js";
+
 const $ = (auswahl, wurzel = document) => wurzel.querySelector(auswahl);
 const $$ = (auswahl, wurzel = document) => [...wurzel.querySelectorAll(auswahl)];
 
@@ -64,20 +66,20 @@ function melden(text, art = "") {
 function aendern() {
   offen = true;
   $("#speichern").disabled = false;
-  $("#speicherstand").textContent = "nicht gespeichert";
+  $("#speicherstand").textContent = t("nicht gespeichert");
   $("#speicherstand").className = "speicherstand offen";
 }
 
 function alsGespeichert() {
   offen = false;
   $("#speichern").disabled = true;
-  $("#speicherstand").textContent = "gespeichert";
+  $("#speicherstand").textContent = t("gespeichert");
   $("#speicherstand").className = "speicherstand";
 }
 
 async function speichern(still = false) {
   if (!offen) return true;
-  $("#speicherstand").textContent = "wird gespeichert …";
+  $("#speicherstand").textContent = t("wird gespeichert …");
   $("#speicherstand").className = "speicherstand laeuft";
   try {
     const antwort = await api("config", "PUT", config);
@@ -98,7 +100,7 @@ async function speichern(still = false) {
     }
     return true;
   } catch (fehler) {
-    $("#speicherstand").textContent = "Speichern fehlgeschlagen";
+    $("#speicherstand").textContent = t("Speichern fehlgeschlagen");
     $("#speicherstand").className = "speicherstand offen";
     melden(`Speichern fehlgeschlagen: ${fehler.message}`, "fehler");
     return false;
@@ -125,7 +127,7 @@ function rueckgaengig() {
   $("#rueckgaengig").disabled = rueckStapel.length === 0;
   aendern();
   wandZeichnen();
-  melden("Letzte Änderung an der Wand zurückgenommen.");
+  melden(t("Letzte Änderung an der Wand zurückgenommen."));
 }
 
 // ---------------------------------------------------------- Vorschaubilder
@@ -180,18 +182,18 @@ async function alleBilderErneuern() {
   if (!mitIp.length) return;
   melden(`Vorschaubilder werden geholt (${mitIp.length}) …`);
   await Promise.all(mitIp.map((k) => bildSicherstellen(k.id, true)));
-  melden("Vorschau erneuert.", "gut");
+  melden(t("Vorschau erneuert."), "gut");
 }
 
 /** Farbe und Klartext zum Zustand einer Kamera. go2rtc verbindet sich erst,
     wenn jemand zuschaut - "kein Bild" heißt also nicht, dass sie tot ist. */
 function kameraZustand(kamera) {
   const gemeldet = status?.kameras?.find((k) => k.id === kamera.id);
-  if (!kamera.ip) return { punkt: "", text: "Platzhalter ohne Adresse" };
-  if (!gemeldet) return { punkt: "", text: "noch nicht geprüft" };
-  if (gemeldet.verbunden) return { punkt: "laeuft", text: "Bild läuft" };
-  if (gemeldet.erreichbar) return { punkt: "gut", text: "antwortet" };
-  return { punkt: "schlecht", text: "antwortet nicht" };
+  if (!kamera.ip) return { punkt: "", text: t("Platzhalter ohne Adresse") };
+  if (!gemeldet) return { punkt: "", text: t("noch nicht geprüft") };
+  if (gemeldet.verbunden) return { punkt: "laeuft", text: t("Bild läuft") };
+  if (gemeldet.erreichbar) return { punkt: "gut", text: t("antwortet") };
+  return { punkt: "schlecht", text: t("antwortet nicht") };
 }
 
 // ------------------------------------------------------------- Übersicht
@@ -218,11 +220,11 @@ function startZeichnen() {
     <div class="karte">
       <div class="beschriftung">Streaming-Dienst</div>
       <div class="zahl klein-text"><span class="punkt ${dienst ? "gut" : "schlecht"}"></span>
-        ${dienst ? "läuft" : "nicht erreichbar"}</div>
+        ${dienst ? t("läuft") : t("nicht erreichbar")}</div>
     </div>
     <div class="karte">
       <div class="beschriftung">Bildschirmausgänge</div>
-      <div class="zahl klein-text">${sicher(status?.ausgaenge?.join(", ") || "keine erkannt")}</div>
+      <div class="zahl klein-text">${sicher(status?.ausgaenge?.join(", ") || t("keine erkannt"))}</div>
     </div>`;
 
   // Kleine Vorschau der Wand, damit man die Zuordnung ohne Umweg sieht.
@@ -247,7 +249,7 @@ function startZeichnen() {
       <div class="uebersicht-kachel">
         <div class="bild">
           <img data-kamera="${sicher(kamera.id)}" alt="">
-          <span class="leer">${kamera.ip ? "Vorschau wird geholt …" : "Platzhalter"}</span>
+          <span class="leer">${kamera.ip ? t("Vorschau wird geholt …") : t("Platzhalter")}</span>
         </div>
         <div class="zeile">
           <span class="punkt ${punkt}"></span>
@@ -255,7 +257,8 @@ function startZeichnen() {
           <span class="klein">${text}</span>
         </div>
       </div>`;
-  }).join("") || "<p class='klein'>Noch keine Kamera eingetragen.</p>";
+  }).join("") || `<p class="klein">${t("Noch keine Kamera eingetragen.")}</p>`;
+  baumUebersetzen($("#start"));
   bilderAlleEinsetzen();
 }
 
@@ -287,13 +290,14 @@ function zustandZeichnen() {
   leiste.innerHTML = `
     <span class="marke-zeile"><span class="punkt ${punkt}"></span><b>${erreichbar}/${alle}</b> erreichbar</span>
     <span class="marke-zeile"><span class="punkt ${status.go2rtc_erreichbar ? "gut" : "schlecht"}"></span>Streaming</span>`;
+  baumUebersetzen(leiste);
   $("#kopfAdresse").textContent = `${status.adresse} · ${String(status.zeit).slice(11)}`;
 
   const port = config?.dienste?.go2rtc_port || 1984;
   $("#anzeigeListe").innerHTML = config.monitore.map((monitor) =>
     `<a href="http://${sicher(status.adresse)}:${port}/?monitor=${monitor.id}"
         target="_blank" rel="noreferrer">${sicher(monitor.name)}</a>`).join("")
-    || "<a>Erst einen Monitor anlegen</a>";
+    || `<a>${t("Erst einen Monitor anlegen")}</a>`;
 }
 
 // ---------------------------------------------------------------- Kameras
@@ -323,21 +327,21 @@ function kamerasZeichnen() {
 
   liste.innerHTML = kameras.map((kamera) => {
     const { punkt, text } = kameraZustand(kamera);
-    const aufloesung = kamera.breite ? `${kamera.breite} × ${kamera.hoehe}` : "Auflösung unbekannt";
+    const aufloesung = kamera.breite ? `${kamera.breite} × ${kamera.hoehe}` : t("Auflösung unbekannt");
     const verwendet = config.monitore.some((m) => m.kacheln.some((k) => k.kamera_id === kamera.id));
     return `
       <div class="zeile-eintrag" data-id="${sicher(kamera.id)}">
         <div class="zeile-bild">
           <img data-kamera="${sicher(kamera.id)}" alt="">
-          <span class="leer">${kamera.ip ? "…" : "ohne Adresse"}</span>
+          <span class="leer">${kamera.ip ? "…" : t("ohne Adresse")}</span>
         </div>
         <div class="zeile-text">
           <div class="zeile-name"><span class="punkt ${punkt}"></span>${sicher(kamera.name)}</div>
           <div class="zeile-angabe">
-            <span>${sicher(kamera.ip) || "keine Adresse"}</span>
+            <span>${sicher(kamera.ip) || t("keine Adresse")}</span>
             <span>${sicher(aufloesung)}</span>
             <span>${text}</span>
-            <span>${verwendet ? "auf der Wand" : "nicht zugeordnet"}</span>
+            <span>${verwendet ? t("auf der Wand") : t("nicht zugeordnet")}</span>
           </div>
         </div>
         <div class="zeile-knoepfe">
@@ -346,6 +350,7 @@ function kamerasZeichnen() {
         </div>
       </div>`;
   }).join("");
+  baumUebersetzen(liste);
   bilderAlleEinsetzen();
   fehlendeBilderHolen();
 }
@@ -409,6 +414,7 @@ function kameraFensterOeffnen(kameraId) {
   }
   bilderAlleEinsetzen();
   fehlendeBilderHolen();
+  baumUebersetzen($("#kameraFenster"));
   $("#kameraFenster").hidden = false;
 }
 
@@ -428,7 +434,7 @@ function zustandSetzen(text, art = "") {
 }
 
 async function kameraPruefen(kameraId, alsMeldung = false) {
-  if (!alsMeldung) zustandSetzen("wird geprüft …", "laeuft");
+  if (!alsMeldung) zustandSetzen(t("wird geprüft …"), "laeuft");
   if (offen && !(await speichern(true))) return;
   try {
     const { ergebnis } = await api(`kameras/${kameraId}/pruefen`, "POST");
@@ -463,11 +469,11 @@ async function kameraPruefen(kameraId, alsMeldung = false) {
 }
 
 async function kameraVorschau(kameraId) {
-  zustandSetzen("Vorschau wird geholt …", "laeuft");
+  zustandSetzen(t("Vorschau wird geholt …"), "laeuft");
   if (offen && !(await speichern(true))) return;
   const adresse = await bildSicherstellen(kameraId, true);
   const kamera = kameraHolen(kameraId);
-  zustandSetzen(adresse ? kameraZustand(kamera).text : "Kein Bild - erst „Prüfen“ versuchen.",
+  zustandSetzen(adresse ? kameraZustand(kamera).text : t("Kein Bild - erst „Prüfen“ versuchen."),
                 adresse ? "" : "schlecht");
 }
 
@@ -482,7 +488,7 @@ async function kameraLoeschen(kameraId) {
     alsGespeichert();
     kameraFensterSchliessen();
     allesZeichnen();
-    melden("Kamera gelöscht.", "gut");
+    melden(t("Kamera gelöscht."), "gut");
   } catch (fehler) {
     melden(`Löschen fehlgeschlagen: ${fehler.message}`, "fehler");
   }
@@ -497,6 +503,7 @@ function neueKameraOeffnen() {
   $("#neuPasswort").value = letzte.passwort || "";
   $("#neuZustand").textContent = "";
   $("#neuZustand").className = "zustand";
+  baumUebersetzen($("#neueKamera"));
   $("#neueKamera").hidden = false;
   $("#neuName").focus();
 }
@@ -575,11 +582,11 @@ async function kameraAnlegen() {
 
 async function alleKamerasPruefen() {
   const ids = config.kameras.filter((k) => k.ip).map((k) => k.id);
-  if (!ids.length) { melden("Keine Kamera mit Adresse.", "fehler"); return; }
+  if (!ids.length) { melden(t("Keine Kamera mit Adresse."), "fehler"); return; }
   melden(`${ids.length} Kameras werden geprüft …`);
   for (const id of ids) await kameraPruefen(id, true);
   kamerasZeichnen();
-  melden("Prüfung fertig.", "gut");
+  melden(t("Prüfung fertig."), "gut");
 }
 
 // -------------------------------------------------------- Wand und Raster
@@ -597,27 +604,28 @@ function wandZeichnen() {
   const benutzt = new Set(config.monitore.flatMap((m) => m.kacheln.map((k) => k.kamera_id)));
   const frei = config.kameras.filter((k) => !benutzt.has(k.id));
   $("#zuordnungStand").textContent = config.kameras.length
-    ? (frei.length ? `${frei.length} noch nicht zugeordnet` : "alle Kameras sind zugeordnet")
+    ? (frei.length ? `${frei.length} ${t("noch nicht zugeordnet")}` : t("alle Kameras sind zugeordnet"))
     : "";
 
   $("#ziehListe").innerHTML = config.kameras.length
     ? config.kameras.map((kamera) => `
         <div class="zieh-kamera${benutzt.has(kamera.id) ? " benutzt" : ""}"
              draggable="true" data-kamera-id="${sicher(kamera.id)}"
-             title="${benutzt.has(kamera.id) ? "liegt schon auf der Wand" : "auf eine Kachel ziehen"}">
+             title="${benutzt.has(kamera.id) ? t("liegt schon auf der Wand") : t("auf eine Kachel ziehen")}">
           <img class="mini" data-kamera="${sicher(kamera.id)}" alt="">
           <div class="text">
             <div>${sicher(kamera.name)}</div>
-            <div class="klein">${sicher(kamera.ip) || "ohne Adresse"}</div>
+            <div class="klein">${sicher(kamera.ip) || t("ohne Adresse")}</div>
           </div>
         </div>`).join("")
-    : "<p class='klein'>Erst Kameras anlegen oder suchen.</p>";
+    : `<p class="klein">${t("Erst Kameras anlegen oder suchen.")}</p>`;
 
   const behaelter = $("#monitore");
   behaelter.innerHTML = "";
   for (const monitor of config.monitore) behaelter.appendChild(monitorZeichnen(monitor));
   $("#aufloesung").value = config.anzeige.aufloesung;
 
+  baumUebersetzen($("#wand"));
   bilderAlleEinsetzen();
   fehlendeBilderHolen();
 }
@@ -630,7 +638,7 @@ function monitorZeichnen(monitor) {
   const ausgaenge = status?.ausgaenge || [];
   const auswahl = ["", ...ausgaenge].map((wert) =>
     `<option value="${sicher(wert)}" ${wert === monitor.ausgang ? "selected" : ""}>
-       ${sicher(wert) || "automatisch"}</option>`).join("");
+       ${sicher(wert) || t("automatisch")}</option>`).join("");
 
   kasten.innerHTML = `
     <div class="monitor-kopf">
@@ -704,7 +712,7 @@ function monitorEreignis(ereignis) {
     return;
   }
   if (knopf && knopf.dataset.tun === "loeschen") {
-    if (config.monitore.length === 1) { melden("Mindestens ein Monitor muss bleiben.", "fehler"); return; }
+    if (config.monitore.length === 1) { melden(t("Mindestens ein Monitor muss bleiben."), "fehler"); return; }
     if (!confirm(`„${monitor.name}“ entfernen?`)) return;
     standMerken();
     config.monitore = config.monitore.filter((m) => Number(m.id) !== Number(monitor.id));
@@ -753,8 +761,8 @@ function zelleZeichnen(monitor, platz) {
     zelle.innerHTML = `
       ${kamera ? `<img class="vorschau" data-kamera="${sicher(kamera.id)}" alt="">` : ""}
       <div class="beschriftung-zelle">
-        <div class="zellen-name">${sicher(kamera ? kamera.name : "Platzhalter")}</div>
-        <div class="zellen-ip">${sicher(kamera?.ip || "ohne Adresse")}</div>
+        <div class="zellen-name">${sicher(kamera ? kamera.name : t("Platzhalter"))}</div>
+        <div class="zellen-ip">${sicher(kamera?.ip || t("ohne Adresse"))}</div>
       </div>
       <div class="zellen-knoepfe">
         <button class="zellen-knopf" data-tun="breiter" title="Breiter">↔</button>
@@ -762,7 +770,7 @@ function zelleZeichnen(monitor, platz) {
         <button class="zellen-knopf" data-tun="leeren" title="Leeren">✕</button>
       </div>`;
   } else {
-    zelle.innerHTML = `<span class="klein">+ Kamera</span>`;
+    zelle.innerHTML = `<span class="klein">${sicher(t("+ Kamera"))}</span>`;
   }
   return zelle;
 }
@@ -834,19 +842,20 @@ function auswahlOeffnen(monitorId, platz) {
   if (!monitor) return;
   auswahlZiel = { monitorId, platz };
 
-  $("#auswahlTitel").textContent = `${monitor.name} · Platz ${platz}`;
+  $("#auswahlTitel").textContent = `${monitor.name} · ${t("Platz")} ${platz}`;
   $("#auswahlLeeren").hidden = !kachelHolen(monitor, platz);
   $("#auswahlListe").innerHTML = config.kameras.length
     ? config.kameras.map((kamera) => `
         <button class="auswahl-eintrag" data-id="${sicher(kamera.id)}">
           <img class="mini" data-kamera="${sicher(kamera.id)}" alt="">
           <span><b>${sicher(kamera.name)}</b><br>
-            <span class="klein">${sicher(kamera.ip) || "ohne Adresse"}</span></span>
+            <span class="klein">${sicher(kamera.ip) || t("ohne Adresse")}</span></span>
         </button>`).join("")
-    : "<p class='klein'>Keine Kamera vorhanden.</p>";
+    : `<p class="klein">${t("Keine Kamera vorhanden.")}</p>`;
 
   bilderAlleEinsetzen();
   fehlendeBilderHolen();
+  baumUebersetzen($("#auswahl"));
   $("#auswahl").hidden = false;
 }
 
@@ -924,7 +933,7 @@ let scanZeitgeber = null;
 
 async function scanStarten() {
   const netz = $("#scanNetz").value.trim();
-  if (!netz) { melden("Bitte einen Netzbereich angeben, z. B. 192.168.1.0/24", "fehler"); return; }
+  if (!netz) { melden(t("Bitte einen Netzbereich angeben, z. B. 192.168.1.0/24"), "fehler"); return; }
   const zugangsdaten = [{ benutzer: $("#scanBenutzer").value.trim(), passwort: $("#scanPasswort").value }];
   try {
     await api("scan", "POST", { netz, zugangsdaten });
@@ -987,6 +996,7 @@ function scanTrefferZeichnen(treffer) {
     haken.addEventListener("change", () => kasten.classList.toggle("gewaehlt", haken.checked));
   }
 
+  baumUebersetzen($("#scanTreffer"));
   $("#scanRahmen").hidden = !treffer.length;
   $("#scanAktionen").hidden = !treffer.length;
   const brauchbare = treffer.filter((t) => t.stream).length;
@@ -1002,7 +1012,7 @@ async function scanUebernehmen() {
     const fund = (stand.treffer || []).find((t) => t.ip === kasten.dataset.ip);
     if (fund) auswahl.push({ ...fund, name: $(".name", kasten).value.trim() });
   }
-  if (!auswahl.length) { melden("Nichts ausgewählt.", "fehler"); return; }
+  if (!auswahl.length) { melden(t("Nichts ausgewählt."), "fehler"); return; }
   try {
     if (offen && !(await speichern(true))) return;
     const antwort = await api("scan/uebernehmen", "POST", { kameras: auswahl });
@@ -1020,6 +1030,7 @@ async function scanUebernehmen() {
 
 const FELDER = [
   ["#setAnlage", "anlage", "name", "text"],
+  ["#setSprache", "anzeige", "sprache", "text"],
   ["#setBildrate", "anzeige", "bildrate", "zahl"],
   ["#setAbstand", "anzeige", "abstand", "zahl"],
   ["#setRand", "anzeige", "rand", "schalter"],
@@ -1070,7 +1081,7 @@ async function sicherungLaden(datei) {
     config = antwort.config;
     alsGespeichert();
     allesZeichnen();
-    melden("Einstellungen eingespielt.", "gut");
+    melden(t("Einstellungen eingespielt."), "gut");
   } catch (fehler) {
     melden(`Einspielen fehlgeschlagen: ${fehler.message}`, "fehler");
   }
@@ -1105,8 +1116,8 @@ function reiterWaehlen(ziel) {
   $$(".reiter-knopf").forEach((k) => k.classList.toggle("aktiv", k.dataset.ziel === ziel));
   $$(".seite").forEach((seite) => seite.classList.toggle("aktiv", seite.id === ziel));
   const [titel, hinweis] = SEITEN[ziel] || ["", ""];
-  $("#seitentitel").textContent = titel;
-  $("#seitenhinweis").textContent = hinweis;
+  $("#seitentitel").textContent = t(titel);
+  $("#seitenhinweis").textContent = t(hinweis);
   $("#seitenleiste").classList.remove("offen");
 
   if (!config) return;
@@ -1123,6 +1134,16 @@ function allesZeichnen() {
   kamerasZeichnen();
   wandZeichnen();
   einstellungenZeichnen();
+  baumUebersetzen();
+}
+
+/** Sprache umschalten: Deutsch und Englisch im Wechsel. */
+function spracheWechseln() {
+  const neue = spracheSetzen(spracheHolen() === "de" ? "en" : "de");
+  $("#sprache").textContent = neue === "de" ? "DE" : "EN";
+  allesZeichnen();
+  reiterWaehlen($$(".reiter-knopf").find((k) => k.classList.contains("aktiv"))?.dataset.ziel
+                || "start");
 }
 
 async function standHolen() {
@@ -1143,6 +1164,9 @@ async function starten() {
       `<div style="padding:40px">Konfiguration nicht ladbar: ${sicher(fehler.message)}</div>`;
     return;
   }
+  const sprache = spracheSetzen(spracheHolen());
+  $("#sprache").textContent = sprache === "de" ? "DE" : "EN";
+
   try { themaSetzen(localStorage.getItem("camgrid-thema") || "system"); }
   catch { themaSetzen("system"); }
 
@@ -1252,6 +1276,7 @@ $("#reiter").addEventListener("click", (ereignis) => {
 $("#menueKnopf").addEventListener("click", () => $("#seitenleiste").classList.toggle("offen"));
 $("#speichern").addEventListener("click", () => speichern());
 $("#thema").addEventListener("click", themaWechseln);
+$("#sprache").addEventListener("click", spracheWechseln);
 $("#rueckgaengig").addEventListener("click", rueckgaengig);
 $("#anzeigeKnopf").addEventListener("click", () => {
   const liste = $("#anzeigeListe");

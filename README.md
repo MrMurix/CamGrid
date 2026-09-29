@@ -5,7 +5,7 @@ Pi — or any other computer — into a video wall: scan your network for camera
 arrange them on screens by drag and drop, done. No subscription, no cloud, no
 account. Everything stays in your own network.
 
-*Deutsche Anleitung: [README.de.md](README.de.md) — die Oberfläche ist auf Deutsch.*
+*Deutsche Anleitung: [README.de.md](README.de.md)*
 
 ![The wall editor](docs/bilder/raster-dunkel.png)
 
@@ -22,8 +22,8 @@ account. Everything stays in your own network.
 - **Build the wall freely** — any number of monitors, grids from 1×1 to 6×6,
   tiles spanning several cells. The editor shows a 16:9 preview of the real
   screen before you save.
-- **Easy to operate** — drag or tap, preview images everywhere, undo, and
-  nothing is saved until you press the button.
+- **Easy to operate** — drag or tap, preview images everywhere, undo, English
+  and German, light and dark, and nothing is saved until you press the button.
 - **Runs on its own** — services start with the system and a watchdog restarts
   display windows that came up empty or crashed.
 - **No extra software** — no Docker, no database, no Python packages. go2rtc
@@ -33,9 +33,10 @@ account. Everything stays in your own network.
 |---|---|
 | ![Cameras](docs/bilder/kameras-dunkel.png) | ![Scan](docs/bilder/suche-dunkel.png) |
 
-> **Note on language:** the user interface is in German. The code, the API and
-> this README are in English. If you need an English interface, open an issue —
-> the strings all live in `web/admin/` and `web/public/`.
+The interface speaks **English and German** — switch any time with the
+**EN/DE** button in the sidebar. New browsers get English unless their system
+language is German. The display page on the monitors follows the setting under
+*Settings → Display → Language*.
 
 ## Installation
 
@@ -95,12 +96,10 @@ Then open **http://127.0.0.1:8080**. To look at the interface with sample data
 
 1. Open the admin interface at `http://<address-of-the-device>:8080`
    Login: **admin / camgrid** — please change it right away under
-   *Einstellungen → Zugang* (Settings → Access). The interface keeps reminding
-   you until you do.
-2. **Kamerasuche** (camera scan): enter a network range such as
-   `192.168.1.0/24` plus the camera password, scan, and take over what it found.
-3. **Wand** (wall): pick a grid, drag cameras into the tiles, press **Speichern**
-   (save).
+   *Settings → Access*. The interface keeps reminding you until you do.
+2. **Camera scan**: enter a network range such as `192.168.1.0/24` plus the
+   camera password, scan, and take over what it found.
+3. **Wall**: pick a grid, drag cameras into the tiles, press **Save**.
 4. The monitors pick up the change by themselves within 15 seconds.
 
 The display page for one monitor lives at `http://<address>:1984/?monitor=1`
@@ -127,7 +126,7 @@ The display page for one monitor lives at `http://<address>:1984/?monitor=1`
 | `app/dienst.py` | starts and supervises go2rtc when there is no service manager |
 | `app/streams.py` | derives `go2rtc.yaml` and `anzeige.json` from the configuration |
 | `app/kioskinfo.py` | monitor details for the kiosk script |
-| `web/admin/` | the admin interface |
+| `web/admin/` | the admin interface (`sprache.js` holds every translated string) |
 | `web/public/` | the display page shown on the monitors |
 | `vendor/go2rtc/` | bundled go2rtc for ARM64, ARM, x86-64 and Windows |
 | `scripts/kiosk.sh` | opens the display windows and supervises them |
@@ -178,12 +177,12 @@ The browser test drives Chrome or Edge headless, expects a running
 
 | Symptom | Cause and fix |
 |---|---|
-| Camera found, but "kein Video" (no video) | Wrong user, password or stream path. Press **Prüfen** (check) in the camera list — it tells you what it found. |
-| Camera answers, but port 554 is closed | Then it cannot do RTSP. CamGrid looks for an MJPEG stream over HTTP instead; if that fails, enter the camera's stream URL under **Vollständige Adresse** (full address) in the camera panel. |
+| Camera found, but no video | Wrong user, password or stream path. Press **Check** in the camera list — it tells you what it found. |
+| Camera answers, but port 554 is closed | Then it cannot do RTSP. CamGrid looks for an MJPEG stream over HTTP instead; if that fails, enter the camera's stream URL under **Full address** in the camera panel. |
 | Picture looks green or purple | Chromium needs `--use-angle=gl`; `scripts/kiosk.sh` sets it. Add it if you start the browser yourself. |
 | Monitors stay white | `tail /var/log/camgrid/kiosk.log`. The watchdog restarts empty windows within a minute. |
 | Display stutters | Use the sub stream instead of the main stream (the scan suggests it) and set the monitors to 1920×1080 at 60 Hz. |
-| "antwortet nicht" although there is a picture | Reachability is probed on port 554. Cameras serving RTSP on another port do not show up there. |
+| "no response" although there is a picture | Reachability is probed on port 554. Cameras serving RTSP on another port do not show up there. |
 
 ## Lessons baked into this project
 

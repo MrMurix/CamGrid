@@ -318,8 +318,8 @@ def hauptlauf(adresse: str) -> int:
         time.sleep(2.0)
         pruefe(steuerung.js("document.getElementById('speichern').disabled") is True,
                "Speichern-Knopf ist danach wieder aus")
-        pruefe(steuerung.js("document.getElementById('speicherstand').textContent") == "gespeichert",
-               "Anzeige meldet gespeichert")
+        pruefe(steuerung.js("document.getElementById('speicherstand').textContent")
+               in ("gespeichert", "saved"), "Anzeige meldet gespeichert")
 
         gespeichert = steuerung.js("""
             fetch('/api/config').then(a => a.json()).then(c =>

@@ -89,6 +89,8 @@ def standard_konfiguration() -> dict:
             "name": "CamGrid",
         },
         "anzeige": {
+            # Sprache der Anzeigeseite auf den Monitoren ("de" oder "en").
+            "sprache": "de",
             "aufloesung": "1920x1080",   # je Monitor, xrandr-Schreibweise
             "bildrate": 60,
             "rand": True,                # Rahmen um jede Kachel
@@ -224,6 +226,9 @@ def aufbereiten(daten: dict) -> dict:
     for bereich in ("anlage", "anzeige", "zugang", "scan", "dienste"):
         werte = daten.get(bereich)
         daten[bereich] = {**vorgabe[bereich], **(werte if isinstance(werte, dict) else {})}
+
+    sprache = str(daten["anzeige"].get("sprache", "de")).lower()
+    daten["anzeige"]["sprache"] = sprache if sprache in ("de", "en") else "de"
 
     daten["version"] = AKTUELLE_VERSION
     _anlage_aufbereiten(daten["anlage"], vorgabe["anlage"])

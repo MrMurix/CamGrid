@@ -42,6 +42,25 @@
 <body>
 <div class="raster" id="raster"></div>
 <script type="module">
+  // Texte der Anzeigeseite. Welche Sprache gilt, steht in der Konfiguration
+  // (Einstellungen -> Anzeige); ohne Angabe entscheidet der Browser.
+  const TEXTE = {
+    en: {
+      "Kein Signal": "No signal",
+      "Kein Bild zugeordnet": "No camera assigned",
+      "Noch keine IP eingetragen": "No address entered yet",
+      "Für Monitor": "Nothing configured for monitor",
+      "ist nichts eingerichtet.": "yet.",
+      "Im Dashboard unter „Monitore\" einen Monitor anlegen.":
+        "Add one in the admin interface under “Wall”.",
+      "anzeige.json konnte nicht gelesen werden:": "Could not read anzeige.json:",
+      "video-stream.js wurde nicht geladen": "video-stream.js was not loaded",
+    },
+  };
+
+  let sprache = "de";
+  const t = (text) => (TEXTE[sprache] && TEXTE[sprache][text]) || text;
+
   const parameter = new URLSearchParams(location.search);
   const monitorNummer = parseInt(parameter.get("monitor") || "1", 10);
   const raster = document.getElementById("raster");
@@ -57,11 +76,14 @@
   const aufbauen = (daten) => {
     raster.innerHTML = "";
     const anzeige = daten.anzeige || {};
+    sprache = anzeige.sprache
+      || ((navigator.language || "de").toLowerCase().startsWith("de") ? "de" : "en");
+    document.documentElement.lang = sprache;
     const monitor = (daten.monitore || []).find((m) => Number(m.id) === monitorNummer)
       || (daten.monitore || [])[monitorNummer - 1];
 
     if (!monitor) {
-      raster.outerHTML = `<div class="fehler">Für Monitor ${monitorNummer} ist nichts eingerichtet.<br>
+      raster.outerHTML = `<div class="fehler">${t("Für Monitor")} ${monitorNummer} ${t("ist nichts eingerichtet.")}<br>
         Im Dashboard unter „Monitore" einen Monitor anlegen.</div>`;
       return;
     }
@@ -100,13 +122,13 @@
       }
 
       if (!kamera) {
-        hinweis.textContent = "Kein Bild zugeordnet";
+        hinweis.textContent = t("Kein Bild zugeordnet");
       } else if (kamera.eingerichtet === false || kamera.aktiv === false) {
-        hinweis.textContent = "Noch keine IP eingetragen";
+        hinweis.textContent = t("Noch keine IP eingetragen");
       } else if (kamera.art === "mjpeg") {
         // Kameras ohne RTSP liefern Einzelbilder im Dauerstrom. Dafür reicht
         // ein Bild-Element - MSE kann mit MJPEG nichts anfangen.
-        hinweis.textContent = "Kein Signal";
+        hinweis.textContent = t("Kein Signal");
         const bild = document.createElement("img");
         bild.className = "mjpeg";
         bild.src = `api/stream.mjpeg?src=${encodeURIComponent(kamera.id)}`;
@@ -117,7 +139,7 @@
         };
         kasten.insertBefore(bild, kasten.firstChild);
       } else {
-        hinweis.textContent = "Kein Signal";
+        hinweis.textContent = t("Kein Signal");
         const video = document.createElement("video-stream");
         video.mode = "mse";                 // WebRTC bringt hier keinen Vorteil
         video.background = true;
@@ -144,11 +166,11 @@
       await Promise.race([
         customElements.whenDefined("video-stream"),
         new Promise((_, ablehnen) => setTimeout(
-          () => ablehnen(new Error("video-stream.js wurde nicht geladen")), 10000)),
+          () => ablehnen(new Error(t("video-stream.js wurde nicht geladen"))), 10000)),
       ]);
       aufbauen(JSON.parse(text));
     } catch (fehler) {
-      raster.outerHTML = `<div class="fehler">anzeige.json konnte nicht gelesen werden:<br>${fehler.message}</div>`;
+      raster.outerHTML = `<div class="fehler">${t("anzeige.json konnte nicht gelesen werden:")}<br>${fehler.message}</div>`;
     }
   };
 
