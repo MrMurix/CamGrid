@@ -1,15 +1,17 @@
-# Änderungen
+# Changelog
 
 ## 1.0.0
 
-Erste Veröffentlichung.
+First release.
 
-- Dashboard im Browser: Kameras verwalten, Monitore und Raster per Ziehen oder
-  Antippen einrichten, Vorschaubilder, Rückgängig, helles und dunkles Aussehen.
-- Kamerasuche im Netz über ONVIF und RTSP, findet Auflösung und Stream-Pfad.
-- Anzeige über go2rtc (liegt im Projekt bei, für ARM64, ARM, x86-64 und Windows).
-- Kiosk-Anzeige mit Überwachung: leere oder abgestürzte Fenster starten neu.
-- Installation für Linux/Raspberry Pi, Windows und macOS.
-- Kameras ohne RTSP: MJPEG über HTTP wird erkannt und abgespielt.
-- Kamera von Hand hinzufügen, inklusive sofortiger Prüfung.
-- Selbsttests: Schnittstelle, echter Browser, Anzeigeseite, echte Kameras.
+- Web interface: manage cameras, build monitors and grids by drag and drop or
+  tapping, preview images, undo, light and dark theme.
+- Network scan over ONVIF and RTSP, detects resolution and stream path.
+- Cameras without RTSP: MJPEG over HTTP is detected and played.
+- Add a camera by hand, checked immediately.
+- Display through go2rtc, bundled for ARM64, ARM, x86-64 and Windows.
+- Kiosk display with a watchdog that restarts empty or crashed windows.
+- Installers for Linux, Windows and macOS, plus a one-command script.
+- Self tests: API, real browser, display page, real cameras.
+
+*Deutsche Fassung: [CHANGELOG.de.md](CHANGELOG.de.md)*

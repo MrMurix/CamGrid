@@ -1,228 +1,229 @@
 # CamGrid
 
-**Viele Kameras, mehrere Monitore, eine Weboberfläche.** CamGrid macht aus
-einem Raspberry Pi (oder jedem anderen Rechner) eine Video-Wand: Kameras im Netz
-suchen, per Ziehen auf Monitore und Raster verteilen, fertig. Kein Abo, keine
-Cloud, kein Konto — alles läuft im eigenen Netz.
+**Many cameras, several monitors, one web interface.** CamGrid turns a Raspberry
+Pi — or any other computer — into a video wall: scan your network for cameras,
+arrange them on screens by drag and drop, done. No subscription, no cloud, no
+account. Everything stays in your own network.
 
-![Das Raster im Dashboard](docs/bilder/raster-dunkel.png)
+*Deutsche Anleitung: [README.de.md](README.de.md) — die Oberfläche ist auf Deutsch.*
 
-*English: turn a Raspberry Pi into a multi-monitor camera wall. Scan the network
-for cameras, arrange them on screens by drag and drop, done. Everything runs
-locally, no cloud, no account. The interface is in German.*
+![The wall editor](docs/bilder/raster-dunkel.png)
 
 ---
 
-## Was es kann
+## What it does
 
-- **Kameras finden** — Netzbereich eingeben, der Rest geht von selbst: ONVIF-Suche,
-  Portprüfung, die üblichen RTSP-Pfade werden durchprobiert. Auflösung, Codec und
-  Stream-Pfad stehen danach fest. Oder von Hand: IP eintragen, CamGrid prüft den
-  Rest selbst.
-- **Auch Kameras ohne RTSP** — ältere Modelle (etwa klassische Mobotix) liefern
-  MJPEG über HTTP. Das erkennt die Suche und spielt es ab.
-- **Raster frei bauen** — beliebig viele Monitore, Raster von 1×1 bis 6×6,
-  Kacheln über mehrere Felder ziehen. Die Vorschau zeigt vorab, wie es auf dem
-  Bildschirm aussieht.
-- **Bedienen ohne Handbuch** — Ziehen oder Antippen, Vorschaubilder überall,
-  Rückgängig, gespeichert wird erst auf Knopfdruck.
-- **Läuft von allein** — Dienste starten mit dem System, eine Überwachung startet
-  leere oder abgestürzte Anzeigefenster automatisch neu.
-- **Ohne Fremdsoftware** — kein Docker, keine Datenbank, keine Python-Pakete.
-  go2rtc liegt fertig im Projekt.
+- **Finds cameras for you** — enter a network range and CamGrid does the rest:
+  ONVIF discovery, port probing, and the usual RTSP paths are tried out. It ends
+  up knowing resolution, codec and the right stream path. Or add a camera by
+  hand: type the IP, CamGrid works out the rest.
+- **Works with cameras that have no RTSP** — older models (classic Mobotix, for
+  example) serve MJPEG over HTTP. CamGrid detects that and plays it.
+- **Build the wall freely** — any number of monitors, grids from 1×1 to 6×6,
+  tiles spanning several cells. The editor shows a 16:9 preview of the real
+  screen before you save.
+- **Easy to operate** — drag or tap, preview images everywhere, undo, and
+  nothing is saved until you press the button.
+- **Runs on its own** — services start with the system and a watchdog restarts
+  display windows that came up empty or crashed.
+- **No extra software** — no Docker, no database, no Python packages. go2rtc
+  ships with the project.
 
-| Kameras verwalten | Kamerasuche |
+| Camera list | Network scan |
 |---|---|
-| ![Kameras](docs/bilder/kameras-dunkel.png) | ![Suche](docs/bilder/suche-dunkel.png) |
+| ![Cameras](docs/bilder/kameras-dunkel.png) | ![Scan](docs/bilder/suche-dunkel.png) |
+
+> **Note on language:** the user interface is in German. The code, the API and
+> this README are in English. If you need an English interface, open an issue —
+> the strings all live in `web/admin/` and `web/public/`.
 
 ## Installation
 
-### Raspberry Pi und andere Linux-Rechner
+### Raspberry Pi and other Linux machines
 
 ```sh
 git clone https://github.com/MrMurix/CamGrid.git
-cd camgrid && sudo ./install.sh
+cd CamGrid && sudo ./install.sh
 ```
 
-Oder alles in einem Befehl:
+Or in a single command:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/MrMurix/CamGrid/main/netz-installation.sh | sudo sh
 ```
 
-Das Skript installiert fehlende Pakete (apt, dnf und pacman macht es selbst),
-richtet die Dienste ein und öffnet die Anzeige nach dem nächsten Login von
-selbst. go2rtc liegt im Projekt — es wird nichts nachgeladen.
+The installer adds missing packages (it handles apt, dnf and pacman itself),
+sets up the services and opens the display after the next login. go2rtc is part
+of the repository, so nothing is downloaded.
 
-Nützliche Schalter: `--user NAME` (Benutzer der grafischen Sitzung),
-`--no-kiosk` (nur Server, keine Anzeige), `--port N` (Port des Dashboards),
-`--dry-run` (zeigt nur, was passieren würde), `--version`.
-Entfernen: `sudo ./uninstall.sh`.
+Useful flags: `--user NAME` (the user running the graphical session),
+`--no-kiosk` (server only, no display), `--port N` (admin port),
+`--dry-run` (show what would happen, change nothing), `--version`.
+Remove it again with `sudo ./uninstall.sh`.
 
 ### Windows
 
 ```powershell
 git clone https://github.com/MrMurix/CamGrid.git
-cd camgrid
+cd CamGrid
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-Braucht keine Administratorrechte. Entfernen: `-Uninstall`.
+No administrator rights required. Remove with `-Uninstall`.
 
 ### macOS
 
 ```sh
 git clone https://github.com/MrMurix/CamGrid.git
-cd camgrid && sudo ./install.sh
+cd CamGrid && sudo ./install.sh
 ```
 
-Die Dienste laufen über launchd. Eine Kiosk-Anzeige richtet das Skript hier
-nicht ein — die Anzeigeseite lässt sich im Browser im Vollbild öffnen.
+Services run through launchd. The installer does not set up a kiosk display
+here; open the display page in a browser in full screen instead.
 
-### Nur ausprobieren, nichts installieren
+### Just try it, install nothing
 
 ```sh
-./start-lokal.sh      # Linux und macOS
+./start-lokal.sh      # Linux and macOS
 start-lokal.cmd       # Windows
 ```
 
-Danach: **http://127.0.0.1:8080**. Wer nur die Oberfläche anschauen will, startet
-`python3 demo.py` — das legt eine Beispielanlage mit erfundenen Kameras an
-(eigene Ports, stört eine laufende Installation nicht).
+Then open **http://127.0.0.1:8080**. To look at the interface with sample data
+(invented cameras, separate ports, nothing touched), run `python3 demo.py`.
 
-## Erste Schritte
+## First steps
 
-1. Dashboard öffnen: `http://<adresse-des-geräts>:8080`
-   Anmeldung: **admin / camgrid** — bitte sofort unter *Einstellungen → Zugang*
-   ändern. Das Dashboard weist darauf hin, bis es geändert ist.
-2. **Kamerasuche**: Netzbereich (z. B. `192.168.1.0/24`) und Kamerapasswort
-   eintragen, suchen, gefundene Kameras übernehmen.
-3. **Monitore & Raster**: Raster wählen, Kameras in die Kacheln ziehen, **Speichern**.
-4. Die Monitore übernehmen die Änderung innerhalb von 15 Sekunden von selbst.
+1. Open the admin interface at `http://<address-of-the-device>:8080`
+   Login: **admin / camgrid** — please change it right away under
+   *Einstellungen → Zugang* (Settings → Access). The interface keeps reminding
+   you until you do.
+2. **Kamerasuche** (camera scan): enter a network range such as
+   `192.168.1.0/24` plus the camera password, scan, and take over what it found.
+3. **Wand** (wall): pick a grid, drag cameras into the tiles, press **Speichern**
+   (save).
+4. The monitors pick up the change by themselves within 15 seconds.
 
-Die Anzeigeseite eines Monitors liegt unter `http://<adresse>:1984/?monitor=1`
-(Monitor 2 entsprechend mit `?monitor=2`).
+The display page for one monitor lives at `http://<address>:1984/?monitor=1`
+(monitor 2 accordingly with `?monitor=2`).
 
-## Voraussetzungen
+## Requirements
 
-- Python 3.11 oder neuer (auf Raspberry Pi OS und den meisten Linux-Systemen dabei)
-- Für die Anzeige am Gerät: Chromium und ein laufender Desktop
-- Kameras mit RTSP (praktisch jede IP-Kamera); ONVIF hilft beim Finden, ist aber
-  nicht nötig
-- `ffmpeg` ist **optional** — Auflösung und Vorschaubild gehen auch ohne
+- Python 3.11 or newer (included in Raspberry Pi OS and most Linux systems)
+- For the display on the device itself: Chromium and a running desktop
+- Cameras with RTSP (practically every IP camera) or MJPEG over HTTP;
+  ONVIF helps with discovery but is not required
+- `ffmpeg` is **optional** — resolution detection and preview images work
+  without it
 
-## Aufbau
+## How it is put together
 
-| Teil | Aufgabe |
+| Part | Job |
 |---|---|
-| `app/server.py` | Dashboard und JSON-Schnittstelle (Port 8080) |
-| `app/config.py` | Konfiguration lesen, prüfen, speichern |
-| `app/scan.py` | Kamerasuche im Netz (ONVIF, Ports, Hersteller über MAC) |
-| `app/rtsp.py` | RTSP-Prüfung in reinem Python: Auflösung und Codec ohne ffmpeg |
-| `app/kamerabild.py` | Vorschaubild direkt von der Kamera (HTTP, Digest-Anmeldung) |
-| `app/dienst.py` | startet und überwacht go2rtc, wenn keine Dienstverwaltung da ist |
-| `app/streams.py` | erzeugt `go2rtc.yaml` und `anzeige.json` aus der Konfiguration |
-| `app/kioskinfo.py` | Monitorangaben für das Kiosk-Skript |
-| `web/admin/` | das Dashboard |
-| `web/public/` | die Anzeigeseite für die Monitore |
-| `vendor/go2rtc/` | mitgeliefertes go2rtc für ARM64, ARM, x86-64 und Windows |
-| `scripts/kiosk.sh` | öffnet die Fenster und überwacht sie dauerhaft |
-| `install.sh`, `install.ps1`, `netz-installation.sh` | Einrichtung je Betriebssystem |
-| `test/` | Selbsttests: Schnittstelle, Browser, Anzeigeseite, echte Kameras |
+| `app/server.py` | admin interface and JSON API (port 8080) |
+| `app/config.py` | read, validate and store the configuration |
+| `app/scan.py` | network scan (ONVIF, ports, vendor via MAC address) |
+| `app/rtsp.py` | RTSP check in pure Python: resolution and codec without ffmpeg |
+| `app/kamerabild.py` | preview image straight from the camera (HTTP, digest auth), MJPEG detection |
+| `app/dienst.py` | starts and supervises go2rtc when there is no service manager |
+| `app/streams.py` | derives `go2rtc.yaml` and `anzeige.json` from the configuration |
+| `app/kioskinfo.py` | monitor details for the kiosk script |
+| `web/admin/` | the admin interface |
+| `web/public/` | the display page shown on the monitors |
+| `vendor/go2rtc/` | bundled go2rtc for ARM64, ARM, x86-64 and Windows |
+| `scripts/kiosk.sh` | opens the display windows and supervises them |
+| `install.sh`, `install.ps1`, `netz-installation.sh` | setup per operating system |
+| `test/` | self tests, see below |
 
-**Streaming** übernimmt [go2rtc](https://github.com/AlexxIT/go2rtc): Es holt die
-RTSP-Ströme und liefert sie als Video an den Browser, dazu die Anzeigeseite auf
-Port 1984. Die Kameras werden nie direkt vom Browser angesprochen.
+**Streaming** is done by [go2rtc](https://github.com/AlexxIT/go2rtc): it pulls
+the RTSP streams and hands them to the browser as video, and it also serves the
+display page on port 1984. The browser never talks to the cameras directly.
 
-Es gibt **eine Quelle der Wahrheit**: `config.json`. Alles andere
-(`go2rtc.yaml`, `anzeige.json`) wird daraus erzeugt — diese Dateien von Hand zu
-ändern hat keinen Sinn.
+There is **one source of truth**: `config.json`. Everything else
+(`go2rtc.yaml`, `anzeige.json`) is generated from it — editing those by hand
+gets you nowhere.
 
-| Pfad (Linux) | Inhalt |
+| Path (Linux) | Contents |
 |---|---|
-| `/opt/camgrid` | Programmdateien |
-| `/etc/camgrid/config.json` | die Konfiguration (Rechte 600, enthält Passwörter) |
-| `/var/lib/camgrid/go2rtc.yaml` | erzeugt, nicht bearbeiten |
-| `/var/log/camgrid/kiosk.log` | Protokoll der Anzeige |
+| `/opt/camgrid` | program files |
+| `/etc/camgrid/config.json` | the configuration (mode 600, contains passwords) |
+| `/var/lib/camgrid/go2rtc.yaml` | generated, do not edit |
+| `/var/log/camgrid/kiosk.log` | log of the display watchdog |
 
-Unter Windows liegt die Konfiguration in `%LOCALAPPDATA%\CamGrid`.
+On Windows the configuration lives in `%LOCALAPPDATA%\CamGrid`.
 
-## Befehle
+## Commands
 
 ```sh
-systemctl status camgrid-admin camgrid-go2rtc   # laufen die Dienste?
-sudo systemctl restart camgrid-go2rtc              # Streams neu starten
-/opt/camgrid/scripts/kiosk.sh --neustart           # Anzeigefenster neu öffnen
-tail -20 /var/log/camgrid/kiosk.log                # was die Überwachung tat
-journalctl -u camgrid-admin -n 50                  # Fehler des Dashboards
-python3 -m app.scan 192.168.1.0/24 admin:passwort     # Kamerasuche ohne Dashboard
+systemctl status camgrid-admin camgrid-go2rtc     # are the services running?
+sudo systemctl restart camgrid-go2rtc             # restart the streams
+/opt/camgrid/scripts/kiosk.sh --neustart          # reopen the display windows
+tail -20 /var/log/camgrid/kiosk.log               # what the watchdog did
+journalctl -u camgrid-admin -n 50                 # errors from the admin server
+python3 -m app.scan 192.168.1.0/24 admin:password # scan without the web interface
 ```
 
-## Selbst prüfen
+## Self tests
 
 ```sh
-python3 test/test_server.py                              # Schnittstelle, ohne Kameras
-python3 test/browsertest.py                              # klickt und zieht im Dashboard
-python3 test/echttest.py 192.168.1.0/24 admin passwort   # gegen echte Kameras
-python3 test/anzeigetest.py                              # Anzeigeseite: läuft Video?
+python3 test/test_server.py                              # API, no cameras needed
+python3 test/browsertest.py                              # clicks and drags in a real browser
+python3 test/echttest.py 192.168.1.0/24 admin password   # against real cameras
+python3 test/anzeigetest.py                              # display page: is video playing?
 ```
 
-Der Browsertest steuert Chrome oder Edge im Hintergrund, erwartet ein laufendes
-`start-lokal` und holt sich die Anmeldedaten aus `test/lokal/config.json`.
+The browser test drives Chrome or Edge headless, expects a running
+`start-lokal`, and picks up the credentials from `test/lokal/config.json`.
 
-## Wenn etwas nicht geht
+## Troubleshooting
 
-| Problem | Ursache und Abhilfe |
+| Symptom | Cause and fix |
 |---|---|
-| Kamera gefunden, aber „kein Video" | Benutzer, Passwort oder Stream-Pfad stimmen nicht. In der Kameraliste auf **Prüfen** — dort steht, was gefunden wurde. |
-| Kamera antwortet, aber Port 554 ist zu | Dann kann sie kein RTSP. CamGrid sucht in dem Fall einen MJPEG-Strom über HTTP; klappt das nicht, im Seitenfenster unter **Vollständige Adresse** die Stream-Adresse der Kamera eintragen. |
-| Bild grün oder lila | Chromium braucht `--use-angle=gl`; `scripts/kiosk.sh` setzt das. Bei eigenem Start ergänzen. |
-| Monitore bleiben weiß | `tail /var/log/camgrid/kiosk.log`. Die Überwachung startet leere Fenster nach spätestens einer Minute neu. |
-| Anzeige ruckelt | Nebenstrom statt Hauptstrom verwenden (die Suche schlägt ihn vor), Monitore auf 1920×1080 bei 60 Hz stellen. |
-| „antwortet nicht" trotz Bild | Der Zustand wird über Port 554 geprüft. Kameras mit RTSP auf einem anderen Port melden sich hier nicht. |
-| Dashboard fragt ständig nach dem Passwort | Nach dem Ändern der Zugangsdaten meldet sich der Browser neu an — einmal die Seite neu laden. |
+| Camera found, but "kein Video" (no video) | Wrong user, password or stream path. Press **Prüfen** (check) in the camera list — it tells you what it found. |
+| Camera answers, but port 554 is closed | Then it cannot do RTSP. CamGrid looks for an MJPEG stream over HTTP instead; if that fails, enter the camera's stream URL under **Vollständige Adresse** (full address) in the camera panel. |
+| Picture looks green or purple | Chromium needs `--use-angle=gl`; `scripts/kiosk.sh` sets it. Add it if you start the browser yourself. |
+| Monitors stay white | `tail /var/log/camgrid/kiosk.log`. The watchdog restarts empty windows within a minute. |
+| Display stutters | Use the sub stream instead of the main stream (the scan suggests it) and set the monitors to 1920×1080 at 60 Hz. |
+| "antwortet nicht" although there is a picture | Reachability is probed on port 554. Cameras serving RTSP on another port do not show up there. |
 
-## Erfahrungen, die in diesem Projekt stecken
+## Lessons baked into this project
 
-Diese Punkte haben im Vorgängerprojekt Zeit gekostet und sind hier fest eingebaut:
+These cost real time in the predecessor project and are handled here already:
 
-- **Chromium braucht `--use-angle=gl`.** Mit der Voreinstellung `gles` sind die
-  Videobilder grün/lila verfärbt.
-- **4K nur mit 30 Hz.** Die Monitore laufen deshalb standardmäßig mit 1920×1080
-  bei 60 Hz; das Bild wird dadurch nicht schlechter, weil die Kamerabilder
-  kleiner sind, aber der Rechner wird deutlich entlastet.
-- **Nach dem Booten 15 Sekunden warten.** Startet Chromium zu früh, hängt es auf
-  langsamen SD-Karten in der Warteschlange der Festplatte und zeigt ein leeres
-  weißes Fenster.
-- **`exit_type` zurücksetzen.** Nach hartem Ausschalten meint Chromium, es sei
-  abgestürzt, und startet mit leerem Fenster.
-- **Zeitstempel an der Adresse.** Sonst zeigt Chromium nach einer Änderung noch
-  die alte Seite aus dem Zwischenspeicher.
-- **Nebenstrom statt Hauptstrom.** Acht 5-Megapixel-Ströme überlasten einen Pi 5;
-  mit dem kleineren Strom liegt er bei etwa der Hälfte.
-- **Überwachung mit echtem Kriterium.** Ein laufender Chromium-Prozess heißt
-  nicht, dass ein Bild zu sehen ist. Geprüft wird, ob die Seite wirklich
-  Verbindungen zum Streaming-Dienst hält.
-- **Schlüsselbund entsperren.** Sonst steht auf einem Gerät ohne Tastatur ein
-  Passwortfenster im Weg.
-- **Kein ffmpeg nötig.** Auflösung und Codec liest `app/rtsp.py` direkt aus dem
-  Stream, das Vorschaubild kommt über die Schnappschuss-Adresse der Kamera.
+- **Chromium needs `--use-angle=gl`.** With the default `gles` the video comes
+  out green and purple.
+- **4K only runs at 30 Hz** on these screens. Monitors therefore default to
+  1920×1080 at 60 Hz — the picture does not get worse, because the camera
+  streams are smaller, but the machine has far less work.
+- **Wait 15 seconds after boot.** Start Chromium too early and it gets stuck in
+  disk I/O on slow SD cards, showing an empty white window.
+- **Reset `exit_type`.** After a hard power-off Chromium believes it crashed and
+  starts with an empty window.
+- **Timestamp in the URL.** Otherwise Chromium shows the old page from cache
+  after a change.
+- **Sub stream, not main stream.** Eight 5-megapixel streams overload a Pi 5.
+- **Supervise with a real criterion.** A running Chromium process does not mean
+  a picture is on screen. The watchdog checks whether the page actually holds
+  connections to the streaming service.
+- **Unlock the keyring.** Otherwise a password dialog sits on a device that has
+  no keyboard.
+- **No ffmpeg needed.** `app/rtsp.py` reads resolution and codec straight from
+  the stream, and preview images come from the camera's snapshot URL.
 
-## Sicherheit
+## Security
 
-- Voreinstellung ist **admin / camgrid**. Bitte beim ersten Start ändern.
-- Kamerapasswörter stehen nur in `config.json` und `go2rtc.yaml` (beide 600).
-  Die Anzeigeseite bekommt weder Passwörter noch Kamera-IP-Adressen.
-- Alles läuft über HTTP im lokalen Netz. Für einen Zugriff von außen gehört ein
-  VPN davor — bitte keine Ports ins Internet freigeben.
+- The default login is **admin / camgrid**. Change it on first start.
+- Camera passwords only live in `config.json` and `go2rtc.yaml` (both mode 600).
+  The display page gets neither passwords nor camera addresses.
+- Everything runs over HTTP inside the local network. For access from outside,
+  put a VPN in front — do not expose the ports to the internet.
 
-## Mitmachen
+## Contributing
 
-Fehlerberichte und Verbesserungen sind willkommen. Vor einem Pull Request bitte
-`python3 test/test_server.py` und, wenn die Oberfläche betroffen ist,
-`python3 test/browsertest.py` laufen lassen.
+Bug reports and improvements are welcome. Before opening a pull request, please
+run `python3 test/test_server.py` and, if the interface is involved,
+`python3 test/browsertest.py`.
 
-## Lizenz
+## License
 
-MIT — siehe [LICENSE](LICENSE). Enthält [go2rtc](https://github.com/AlexxIT/go2rtc)
-(ebenfalls MIT).
+MIT — see [LICENSE](LICENSE). Bundles [go2rtc](https://github.com/AlexxIT/go2rtc)
+(MIT as well).
