@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CamGrid – Verwaltung</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- Symbole: einmal definiert, überall über <use> eingesetzt -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="sym-start" viewBox="0 0 24 24"><path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z"/></symbol>
+  <symbol id="sym-kamera" viewBox="0 0 24 24"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V8a1 1 0 011-1zm8 3a3.5 3.5 0 100 7 3.5 3.5 0 000-7z"/></symbol>
+  <symbol id="sym-wand" viewBox="0 0 24 24"><path d="M3 4h8v7H3zM13 4h8v7h-8zM3 13h8v7H3zM13 13h8v7h-8z"/></symbol>
+  <symbol id="sym-suche" viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 015.9 12.1l4.3 4.3-1.4 1.4-4.3-4.3A7.5 7.5 0 1110.5 3zm0 2a5.5 5.5 0 100 11 5.5 5.5 0 000-11z"/></symbol>
+  <symbol id="sym-einstellungen" viewBox="0 0 24 24"><path d="M12 8a4 4 0 110 8 4 4 0 010-8zm8.4 4l1.5 1.2-1.5 2.6-1.9-.5a7.6 7.6 0 01-1.6.9l-.4 1.8h-3l-.4-1.8a7.6 7.6 0 01-1.6-.9l-1.9.5-1.5-2.6L7.6 12l-1.5-1.2 1.5-2.6 1.9.5c.5-.4 1-.7 1.6-.9l.4-1.8h3l.4 1.8c.6.2 1.1.5 1.6.9l1.9-.5 1.5 2.6z"/></symbol>
+  <symbol id="sym-pruefen" viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></symbol>
+  <symbol id="sym-bild" viewBox="0 0 24 24"><path d="M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zm2 11h12l-3.8-5-3 4-2.2-2.7z"/></symbol>
+  <symbol id="sym-muell" viewBox="0 0 24 24"><path d="M9 3h6l1 2h4v2H4V5h4zM6 8h12l-1 12a1 1 0 01-1 1H8a1 1 0 01-1-1z"/></symbol>
+  <symbol id="sym-plus" viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></symbol>
+  <symbol id="sym-zurueck" viewBox="0 0 24 24"><path d="M9 7V4L3 9l6 5v-3h6a4 4 0 010 8h-3v2h3a6 6 0 000-12z"/></symbol>
+  <symbol id="sym-extern" viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.4l-8.3 8.3-1.4-1.4L17.6 5H14zM5 5h5v2H6v11h11v-4h2v6H4V5z"/></symbol>
+  <symbol id="sym-thema" viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18V3z"/></symbol>
+  <symbol id="sym-menue" viewBox="0 0 24 24"><path d="M3 6h18v2H3zM3 11h18v2H3zM3 16h18v2H3z"/></symbol>
+  <symbol id="sym-schliessen" viewBox="0 0 24 24"><path d="M18.3 7.1l-1.4-1.4L12 10.6 7.1 5.7 5.7 7.1l4.9 4.9-4.9 4.9 1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9z"/></symbol>
+</svg>
+
+<div class="huelle">
+
+  <!-- ------------------------------------------------------ Seitenleiste -->
+  <aside class="seitenleiste" id="seitenleiste">
+    <div class="marke">
+      <span class="logo">▦</span>
+      <div class="marke-text">
+        <strong>CamGrid</strong>
+        <span id="anlagenname">CamGrid</span>
+      </div>
+    </div>
+
+    <nav class="navigation" id="reiter" aria-label="Hauptnavigation">
+      <button class="reiter-knopf aktiv" data-ziel="start">
+        <svg class="symbol"><use href="#sym-start"/></svg><span>Übersicht</span></button>
+      <button class="reiter-knopf" data-ziel="kameras">
+        <svg class="symbol"><use href="#sym-kamera"/></svg><span>Kameras</span>
+        <span class="zaehler" id="zaehlerKameras"></span></button>
+      <button class="reiter-knopf" data-ziel="wand">
+        <svg class="symbol"><use href="#sym-wand"/></svg><span>Wand</span></button>
+      <button class="reiter-knopf" data-ziel="suche">
+        <svg class="symbol"><use href="#sym-suche"/></svg><span>Kamerasuche</span></button>
+      <button class="reiter-knopf" data-ziel="einstellungen">
+        <svg class="symbol"><use href="#sym-einstellungen"/></svg><span>Einstellungen</span></button>
+    </nav>
+
+    <div class="seitenleiste-fuss">
+      <div class="zustand-leiste" id="zustandLeiste"></div>
+      <div class="fuss-zeile">
+        <span class="klein" id="kopfAdresse">wird geladen …</span>
+        <button class="knopf knopf-still" id="thema" title="Helles oder dunkles Aussehen">
+          <svg class="symbol"><use href="#sym-thema"/></svg></button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ----------------------------------------------------------- Inhalt -->
+  <div class="inhalt">
+    <header class="kopfzeile">
+      <button class="knopf knopf-still menue-knopf" id="menueKnopf" aria-label="Menü">
+        <svg class="symbol"><use href="#sym-menue"/></svg></button>
+      <div class="kopf-titel">
+        <h1 id="seitentitel">Übersicht</h1>
+        <p class="klein" id="seitenhinweis"></p>
+      </div>
+      <div class="kopf-aktionen">
+        <span class="speicherstand" id="speicherstand">gespeichert</span>
+        <button class="knopf knopf-haupt" id="speichern" disabled title="Strg+S">Speichern</button>
+        <div class="menue" id="anzeigeMenue">
+          <button class="knopf" id="anzeigeKnopf">
+            <svg class="symbol"><use href="#sym-extern"/></svg><span class="nur-breit">Anzeige</span> ▾</button>
+          <div class="menue-inhalt" id="anzeigeListe" hidden></div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="hinweisbalken warnung" id="passwortHinweis" hidden>
+        <span>⚠</span>
+        <span class="wachsen">Es gilt noch das Standardpasswort. Bitte unter
+          <b>Einstellungen → Zugang</b> ändern, sonst kommt jeder im Netz an die Kameras.</span>
+        <button class="knopf knopf-klein" data-gehe="einstellungen">Jetzt ändern</button>
+      </div>
+
+      <!-- ------------------------------------------------------ Übersicht -->
+      <section id="start" class="seite aktiv">
+        <div id="assistent" class="assistent" hidden>
+          <h2>In drei Schritten fertig</h2>
+          <ol class="schritte">
+            <li>
+              <div class="schritt-text"><b>Kameras finden</b><br>
+                <span class="klein">Netzbereich eingeben, den Rest macht die Suche.</span></div>
+              <button class="knopf knopf-haupt" data-gehe="suche">Kamerasuche öffnen</button>
+            </li>
+            <li>
+              <div class="schritt-text"><b>Auf die Monitore verteilen</b><br>
+                <span class="klein">Raster wählen, Kameras in die Kacheln setzen.</span></div>
+              <button class="knopf" data-gehe="wand">Wand einrichten</button>
+            </li>
+            <li>
+              <div class="schritt-text"><b>Anzeige prüfen</b><br>
+                <span class="klein">Die Monitore übernehmen Änderungen von selbst.</span></div>
+              <button class="knopf" id="assistentAnzeige">Anzeige öffnen</button>
+            </li>
+          </ol>
+        </div>
+
+        <div class="karten" id="statusKarten"></div>
+
+        <h2>Wand</h2>
+        <div class="wand-vorschau" id="wandVorschau"></div>
+
+        <h2>Kameras</h2>
+        <div class="uebersicht-liste" id="uebersichtListe"></div>
+      </section>
+
+      <!-- -------------------------------------------------------- Kameras -->
+      <section id="kameras" class="seite">
+        <div class="werkzeugleiste">
+          <button class="knopf knopf-haupt" id="kameraNeu">
+            <svg class="symbol"><use href="#sym-plus"/></svg>Kamera</button>
+          <button class="knopf" id="kamerasPruefen">
+            <svg class="symbol"><use href="#sym-pruefen"/></svg>Alle prüfen</button>
+          <button class="knopf" id="bilderHolen">
+            <svg class="symbol"><use href="#sym-bild"/></svg>Vorschau erneuern</button>
+          <span class="wachsen"></span>
+          <input type="search" id="kameraSuche" placeholder="Filtern nach Name oder Adresse">
+        </div>
+        <div class="tabelle-rahmen">
+          <div class="liste" id="kameraListe"></div>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------- Wand -->
+      <section id="wand" class="seite">
+        <div class="werkzeugleiste">
+          <button class="knopf knopf-haupt" id="monitorNeu">
+            <svg class="symbol"><use href="#sym-plus"/></svg>Monitor</button>
+          <button class="knopf" id="rueckgaengig" disabled title="Strg+Z">
+            <svg class="symbol"><use href="#sym-zurueck"/></svg>Rückgängig</button>
+          <label class="feld-inline">Auflösung
+            <select id="aufloesung">
+              <option value="1920x1080">1920 × 1080 · 60 Hz (empfohlen)</option>
+              <option value="1280x720">1280 × 720</option>
+              <option value="2560x1440">2560 × 1440</option>
+              <option value="3840x2160">3840 × 2160 (nur 30 Hz)</option>
+            </select>
+          </label>
+          <span class="wachsen"></span>
+          <span class="klein nur-breit">Ziehen oder Kachel antippen · gespeichert wird auf Knopfdruck</span>
+        </div>
+
+        <div class="hinweisbalken nur-schmal">
+          <span>👆</span><span>Auf eine Kachel tippen und die Kamera aus der Liste wählen.</span>
+        </div>
+
+        <div class="wand-aufbau">
+          <div class="monitore" id="monitore"></div>
+          <aside class="kamera-leiste">
+            <h3>Kameras</h3>
+            <p class="klein" id="zuordnungStand"></p>
+            <div id="ziehListe" class="zieh-liste"></div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------- Kamerasuche -->
+      <section id="suche" class="seite">
+        <div class="karte">
+          <div class="feld-gruppe">
+            <label class="feld">Netzbereich
+              <input type="text" id="scanNetz" placeholder="192.168.1.0/24"></label>
+            <label class="feld">Benutzer
+              <input type="text" id="scanBenutzer" placeholder="admin"></label>
+            <label class="feld">Passwort
+              <span class="passwortfeld">
+                <input type="password" id="scanPasswort" placeholder="Kamerapasswort">
+                <button type="button" class="augenknopf" data-zeigt="scanPasswort">◉</button>
+              </span></label>
+            <button class="knopf knopf-haupt" id="scanStart">
+              <svg class="symbol"><use href="#sym-suche"/></svg>Suche starten</button>
+          </div>
+          <p class="klein" id="scanTipp">
+            Die Suche probiert die üblichen Kamera-Adressen durch. Ein Bereich mit 254 Adressen
+            dauert etwa eine Minute.
+          </p>
+          <div class="fortschritt" id="scanFortschritt" hidden>
+            <div class="balken"><div class="balken-fuellung" id="scanBalken"></div></div>
+            <span id="scanText">Suche läuft …</span>
+          </div>
+        </div>
+
+        <div class="werkzeugleiste" id="scanAktionen" hidden>
+          <button class="knopf knopf-haupt" id="scanUebernehmen">Ausgewählte übernehmen</button>
+          <button class="knopf" id="scanAlle">Alle auswählen</button>
+          <span class="klein" id="scanZusammenfassung"></span>
+        </div>
+        <div class="tabelle-rahmen" id="scanRahmen" hidden>
+          <div class="liste" id="scanTreffer"></div>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------- Einstellungen -->
+      <section id="einstellungen" class="seite">
+        <div class="karten-spalten">
+          <div class="karte">
+            <h3>Anzeige</h3>
+            <label class="feld">Name der Anlage <input type="text" id="setAnlage"></label>
+            <div class="feld-paar">
+              <label class="feld">Bildrate (Hz) <input type="number" id="setBildrate" min="24" max="120"></label>
+              <label class="feld">Abstand (Pixel) <input type="number" id="setAbstand" min="0" max="60"></label>
+            </div>
+            <label class="feld">Hintergrundfarbe <input type="color" id="setHintergrund"></label>
+            <label class="schalter"><input type="checkbox" id="setRand"> <span>Rahmen um jede Kachel</span></label>
+            <label class="schalter"><input type="checkbox" id="setBeschriftung"> <span>Kameranamen einblenden</span></label>
+          </div>
+
+          <div class="karte">
+            <h3>Zugang</h3>
+            <div class="feld-paar">
+              <label class="feld">Admin-Benutzer <input type="text" id="setAdminBenutzer"></label>
+              <label class="feld">Admin-Passwort
+                <span class="passwortfeld">
+                  <input type="password" id="setAdminPasswort">
+                  <button type="button" class="augenknopf" data-zeigt="setAdminPasswort">◉</button>
+                </span></label>
+            </div>
+            <p class="klein">Für diese Verwaltung. Nach dem Ändern meldet sich der Browser neu an.</p>
+            <div class="feld-paar">
+              <label class="feld">Anzeige-Benutzer <input type="text" id="setAnzeigeBenutzer"></label>
+              <label class="feld">Anzeige-Passwort
+                <span class="passwortfeld">
+                  <input type="password" id="setAnzeigePasswort">
+                  <button type="button" class="augenknopf" data-zeigt="setAnzeigePasswort">◉</button>
+                </span></label>
+            </div>
+            <p class="klein">Nur für den Aufruf der Anzeigeseite von anderen Rechnern. Die Monitore
+              am Gerät selbst brauchen keinen Login.</p>
+          </div>
+
+          <div class="karte">
+            <h3>Dienste</h3>
+            <div class="werkzeugleiste">
+              <button class="knopf" id="dienstAnwenden">Kameras neu übernehmen</button>
+              <button class="knopf" id="kioskNeustart">Anzeige neu starten</button>
+            </div>
+            <p class="klein">„Neu übernehmen“ meldet alle Streams neu an, ohne die Monitore zu
+              unterbrechen.</p>
+            <h3 style="margin-top:22px">Sicherung</h3>
+            <div class="werkzeugleiste">
+              <button class="knopf" id="sicherungSpeichern">Herunterladen</button>
+              <label class="knopf dateiknopf">Einspielen
+                <input type="file" id="sicherungLaden" accept="application/json" hidden></label>
+            </div>
+            <p class="klein">Die Datei enthält auch die Kamerapasswörter — bitte sicher aufbewahren.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- --------------------------------------------- Seitenfenster: Kamera -->
+<div class="schublade-huelle" id="kameraFenster" hidden>
+  <aside class="schublade">
+    <div class="schublade-kopf">
+      <h2 id="schubladeTitel">Kamera</h2>
+      <button class="knopf knopf-still" id="schubladeZu" aria-label="Schließen">
+        <svg class="symbol"><use href="#sym-schliessen"/></svg></button>
+    </div>
+    <div class="schublade-inhalt" id="schubladeInhalt"></div>
+  </aside>
+</div>
+
+<!-- ------------------------------------------ Kamera von Hand anlegen -->
+<div class="ueberlagerung" id="neueKamera" hidden>
+  <div class="auswahl-kasten">
+    <h3>Kamera hinzufügen</h3>
+    <p class="klein">IP eintragen und auf <b>Hinzufügen</b> — Zugangsdaten, Stream-Pfad und
+      Auflösung sucht CamGrid selbst. Kameras ohne RTSP werden dabei erkannt.</p>
+    <label class="feld">Name <input type="text" id="neuName" placeholder="z. B. Halle Nord"></label>
+    <label class="feld">IP-Adresse <input type="text" id="neuIp" placeholder="192.168.1.64"></label>
+    <div class="feld-paar">
+      <label class="feld">Benutzer <input type="text" id="neuBenutzer" placeholder="admin"></label>
+      <label class="feld">Passwort
+        <span class="passwortfeld">
+          <input type="password" id="neuPasswort">
+          <button type="button" class="augenknopf" data-zeigt="neuPasswort">◉</button>
+        </span></label>
+    </div>
+    <details>
+      <summary class="klein">Von Hand festlegen (falls nichts gefunden wird)</summary>
+      <label class="feld" style="margin-top:12px">Stream-Pfad
+        <input type="text" id="neuPfad" placeholder="stream1"></label>
+      <label class="feld">Vollständige Adresse
+        <input type="text" id="neuQuelle" placeholder="rtsp://… oder http://…/video.mjpg"></label>
+      <p class="klein">Die vollständige Adresse hat Vorrang. Damit laufen auch Kameras,
+        die kein RTSP anbieten.</p>
+    </details>
+    <p class="zustand" id="neuZustand"></p>
+    <div class="werkzeugleiste">
+      <span class="wachsen"></span>
+      <button class="knopf" id="neuAbbrechen">Abbrechen</button>
+      <button class="knopf knopf-haupt" id="neuAnlegen">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------- Auswahl: Kamera auf eine Kachel -->
+<div class="ueberlagerung" id="auswahl" hidden>
+  <div class="auswahl-kasten">
+    <h3 id="auswahlTitel">Kamera wählen</h3>
+    <div class="auswahl-liste" id="auswahlListe"></div>
+    <div class="werkzeugleiste">
+      <button class="knopf" id="auswahlLeeren">Kachel leeren</button>
+      <span class="wachsen"></span>
+      <button class="knopf" id="auswahlAbbrechen">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="meldung" id="meldung" hidden></div>
+
+<script src="admin.js" type="module"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Erzeugte Dateien und Testläufe
+__pycache__/
+*.pyc
+test/demo/
+test/lokal/
+test/echt/
+test/lauf/
+test/*.log
+web/public/anzeige.json
+test/bilder/

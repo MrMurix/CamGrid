@@ -1,0 +1,23 @@
+# CamGrid - Admin-Server (Verwaltungsoberflaeche und JSON-Schnittstelle)
+# __DIENSTBENUTZER__, __DIENSTGRUPPE__ und __PYTHON__ werden von install.sh ersetzt.
+[Unit]
+Description=CamGrid Admin-Server
+Documentation=file:///opt/camgrid
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__DIENSTBENUTZER__
+Group=__DIENSTGRUPPE__
+WorkingDirectory=/opt/camgrid
+Environment=PYTHONUNBUFFERED=1
+ExecStart=__PYTHON__ /opt/camgrid/app/server.py --config /etc/camgrid/config.json
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=camgrid-admin
+
+[Install]
+WantedBy=multi-user.target

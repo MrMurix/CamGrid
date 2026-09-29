@@ -1,0 +1,25 @@
+# CamGrid - Streaming-Dienst (go2rtc) samt Anzeigeseite auf Port 1984
+# __DIENSTBENUTZER__, __DIENSTGRUPPE__ und __PYTHON__ werden von install.sh ersetzt.
+# ExecStartPre erzeugt /var/lib/camgrid/go2rtc.yaml aus der Konfiguration.
+[Unit]
+Description=CamGrid Streaming-Dienst (go2rtc)
+Documentation=https://github.com/AlexxIT/go2rtc
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__DIENSTBENUTZER__
+Group=__DIENSTGRUPPE__
+WorkingDirectory=/var/lib/camgrid
+Environment=PYTHONUNBUFFERED=1
+ExecStartPre=__PYTHON__ /opt/camgrid/app/streams.py
+ExecStart=/opt/camgrid/bin/go2rtc -config /var/lib/camgrid/go2rtc.yaml
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=camgrid-go2rtc
+
+[Install]
+WantedBy=multi-user.target

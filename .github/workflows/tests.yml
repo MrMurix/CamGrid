@@ -1,0 +1,30 @@
+# Prüft bei jedem Push, ob CamGrid noch zusammenpasst.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Schnittstelle prüfen (ohne Kameras)
+        run: python test/test_server.py
+
+      - name: Shell-Skripte auf Syntaxfehler prüfen
+        run: |
+          for datei in install.sh uninstall.sh netz-installation.sh scripts/*.sh start-lokal.sh; do
+            [ -f "$datei" ] || continue
+            sh -n "$datei" && echo "ok $datei"
+          done
+
+      - name: Installation im Probelauf
+        run: sh install.sh --dry-run

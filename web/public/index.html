@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="de" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>CamGrid</title>
+<script type="module" src="video-stream.js"></script>
+<style>
+  [hidden] { display: none !important; }   /* sonst ueberstimmt display:flex das Ausblenden */
+  html, body { margin: 0; height: 100%; background: #0e1116; overflow: hidden; }
+  body.kiosk { cursor: none; }
+  .raster {
+    display: grid; height: 100vh; box-sizing: border-box;
+    gap: 14px; padding: 14px;
+  }
+  .kachel {
+    position: relative; background: #000; border-radius: 10px; overflow: hidden;
+    border: 2px solid #2a313c;
+  }
+  .kachel.ohne-rand { border: none; border-radius: 0; }
+  .kachel video-stream { position: absolute; inset: 0; }
+  .kachel video-stream > :not(video) { display: none !important; }
+  .kachel video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+  .kachel img.mjpeg { position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; background: #000; }
+  video::-webkit-media-controls, video::-webkit-media-controls-enclosure { display: none !important; }
+  .kachel .name {
+    position: absolute; left: 12px; top: 10px; z-index: 2;
+    font: 600 20px system-ui, sans-serif; color: #e6e9ee;
+    background: rgba(14, 17, 22, .65); padding: 4px 12px; border-radius: 6px;
+  }
+  .kachel .hinweis {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 500 26px system-ui, sans-serif; color: #5c6675; text-align: center; padding: 20px;
+  }
+  .fehler {
+    color: #e6e9ee; font: 500 22px system-ui, sans-serif; padding: 40px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="raster" id="raster"></div>
+<script type="module">
+  const parameter = new URLSearchParams(location.search);
+  const monitorNummer = parseInt(parameter.get("monitor") || "1", 10);
+  const raster = document.getElementById("raster");
+  if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+    document.body.classList.add("kiosk");
+  }
+
+  const einstellungenLaden = async () =>
+    (await fetch("anzeige.json", { cache: "no-store" })).text();
+
+  let letzterStand = "";
+
+  const aufbauen = (daten) => {
+    raster.innerHTML = "";
+    const anzeige = daten.anzeige || {};
+    const monitor = (daten.monitore || []).find((m) => Number(m.id) === monitorNummer)
+      || (daten.monitore || [])[monitorNummer - 1];
+
+    if (!monitor) {
+      raster.outerHTML = `<div class="fehler">Für Monitor ${monitorNummer} ist nichts eingerichtet.<br>
+        Im Dashboard unter „Monitore" einen Monitor anlegen.</div>`;
+      return;
+    }
+
+    document.body.style.background = anzeige.hintergrund || "#0e1116";
+    raster.style.gridTemplateColumns = `repeat(${monitor.spalten}, 1fr)`;
+    raster.style.gridTemplateRows = `repeat(${monitor.zeilen}, 1fr)`;
+    const abstand = Number.isFinite(anzeige.abstand) ? anzeige.abstand : 14;
+    raster.style.gap = `${abstand}px`;
+    raster.style.padding = `${abstand}px`;
+
+    const kameras = new Map((daten.kameras || []).map((k) => [k.id, k]));
+    const kacheln = (monitor.kacheln || []).slice()
+      .sort((a, b) => a.platz - b.platz);
+
+    for (const kachel of kacheln) {
+      const kamera = kachel.kamera_id ? kameras.get(kachel.kamera_id) : null;
+      const kasten = document.createElement("div");
+      kasten.className = "kachel" + (anzeige.rand === false ? " ohne-rand" : "");
+
+      // Platz im Raster: laufende Nummer in Spalte/Zeile umrechnen.
+      const spalte = ((kachel.platz - 1) % monitor.spalten) + 1;
+      const zeile = Math.floor((kachel.platz - 1) / monitor.spalten) + 1;
+      kasten.style.gridColumn = `${spalte} / span ${Math.min(kachel.breite || 1, monitor.spalten - spalte + 1)}`;
+      kasten.style.gridRow = `${zeile} / span ${Math.min(kachel.hoehe || 1, monitor.zeilen - zeile + 1)}`;
+
+      const hinweis = document.createElement("div");
+      hinweis.className = "hinweis";
+      kasten.appendChild(hinweis);
+
+      if (anzeige.beschriftung !== false) {
+        const name = document.createElement("div");
+        name.className = "name";
+        name.textContent = kachel.name || (kamera ? kamera.name : "");
+        if (name.textContent) kasten.appendChild(name);
+      }
+
+      if (!kamera) {
+        hinweis.textContent = "Kein Bild zugeordnet";
+      } else if (kamera.eingerichtet === false || kamera.aktiv === false) {
+        hinweis.textContent = "Noch keine IP eingetragen";
+      } else if (kamera.art === "mjpeg") {
+        // Kameras ohne RTSP liefern Einzelbilder im Dauerstrom. Dafür reicht
+        // ein Bild-Element - MSE kann mit MJPEG nichts anfangen.
+        hinweis.textContent = "Kein Signal";
+        const bild = document.createElement("img");
+        bild.className = "mjpeg";
+        bild.src = `api/stream.mjpeg?src=${encodeURIComponent(kamera.id)}`;
+        bild.onload = () => { hinweis.hidden = true; };
+        bild.onerror = () => {
+          hinweis.hidden = false;
+          setTimeout(() => { bild.src = `api/stream.mjpeg?src=${encodeURIComponent(kamera.id)}&t=${Date.now()}`; }, 10000);
+        };
+        kasten.insertBefore(bild, kasten.firstChild);
+      } else {
+        hinweis.textContent = "Kein Signal";
+        const video = document.createElement("video-stream");
+        video.mode = "mse";                 // WebRTC bringt hier keinen Vorteil
+        video.background = true;
+        video.visibilityCheck = false;
+        video.src = new URL(`api/ws?src=${encodeURIComponent(kamera.id)}`, location.href);
+        kasten.insertBefore(video, kasten.firstChild);
+        // "Kein Signal" nur zeigen, solange wirklich kein Bild läuft.
+        setInterval(() => {
+          const element = video.querySelector("video");
+          const laeuft = !!(element && element.readyState >= 2);
+          hinweis.hidden = laeuft;
+          video.style.visibility = laeuft ? "visible" : "hidden";
+        }, 1000);
+      }
+      raster.appendChild(kasten);
+    }
+  };
+
+  const starten = async () => {
+    try {
+      const text = await einstellungenLaden();
+      letzterStand = text;
+      // Fehlt video-stream.js, würde die Seite ewig warten - deshalb mit Frist.
+      await Promise.race([
+        customElements.whenDefined("video-stream"),
+        new Promise((_, ablehnen) => setTimeout(
+          () => ablehnen(new Error("video-stream.js wurde nicht geladen")), 10000)),
+      ]);
+      aufbauen(JSON.parse(text));
+    } catch (fehler) {
+      raster.outerHTML = `<div class="fehler">anzeige.json konnte nicht gelesen werden:<br>${fehler.message}</div>`;
+    }
+  };
+
+  await starten();
+
+  // Änderungen aus dem Dashboard innerhalb von 15 Sekunden übernehmen.
+  setInterval(async () => {
+    try {
+      const text = await einstellungenLaden();
+      if (text !== letzterStand) location.reload();
+    } catch { /* Dienst kurz weg - beim nächsten Mal wieder versuchen */ }
+  }, 15000);
+
+  // Einmal pro Stunde neu laden, damit ein eingefrorenes Bild nie lange steht.
+  setTimeout(() => location.reload(), 3600000);
+</script>
+</body>
+</html>

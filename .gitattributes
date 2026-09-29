@@ -1,0 +1,4 @@
+# Auf dem Pi laufen Shell-Skripte nur mit Unix-Zeilenenden.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
