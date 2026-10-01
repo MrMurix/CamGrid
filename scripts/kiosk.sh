@@ -1,41 +1,40 @@
 #!/bin/sh
-# CamGrid - Kiosk-Anzeige
+# CamGrid - kiosk display
 #
-# Richtet die Bildschirme ein, startet pro Monitor ein Chromium-Fenster im
-# Kiosk-Modus auf der Anzeigeseite des Streaming-Dienstes und ueberwacht die
-# Fenster dauerhaft.
+# Sets up the screens, starts one Chromium window per monitor in kiosk mode on
+# the display page of the streaming service and keeps watching the windows.
 #
-# Aufruf: kiosk.sh [--einmal] [--neustart] [--help]
+# Usage: kiosk.sh [--einmal] [--neustart] [--help]
 #
-# Erfahrungswerte, die hier bewusst so umgesetzt sind:
-#   - Nach dem Systemstart ist eine Wartezeit notwendig, sonst haengt Chromium
-#     im Zustand D (disk sleep) auf der SD-Karte und zeigt leere weisse Fenster.
-#   - --use-angle=gl ist zwingend, sonst sind die Videobilder gruen/lila.
-#   - 4K laeuft an diesen Geraeten nur mit 30 Hz und ueberlastet den Pi;
-#     Standard ist daher 1920x1080 mit 60 Hz.
-#   - Der Zeitstempel in der Adresse verhindert, dass Chromium eine alte
-#     Seitenfassung aus dem Zwischenspeicher zeigt.
-#   - "exit_type" muss vor dem Start von "Crashed" auf "Normal" gesetzt werden,
-#     sonst startet Chromium nach hartem Ausschalten mit leerem Fenster.
+# Lessons learned that are implemented here on purpose:
+#   - After a system start a waiting time is required, otherwise Chromium hangs
+#     in state D (disk sleep) on the SD card and shows empty white windows.
+#   - --use-angle=gl is mandatory, otherwise the video images are green/purple.
+#   - 4K runs on these devices only at 30 Hz and overloads the Pi; the default
+#     is therefore 1920x1080 at 60 Hz.
+#   - The timestamp in the address keeps Chromium from showing an old version
+#     of the page from its cache.
+#   - "exit_type" must be changed from "Crashed" to "Normal" before the start,
+#     otherwise Chromium comes up with an empty window after a hard power-off.
 set -u
 
 CONFDATEI="/etc/camgrid/config.json"
 KIOSKINFO="/opt/camgrid/app/kioskinfo.py"
-ANZEIGEPORT="1984"        # wird aus der Konfiguration ueberschrieben
+ANZEIGEPORT="1984"        # overwritten from the configuration
 ANZEIGEURL="http://127.0.0.1:$ANZEIGEPORT/"
 
 BREITE_STANDARD="1920"
 HOEHE_STANDARD="1080"
 BILDRATE_STANDARD="60"
 
-XWARTEZEIT="120"          # Sekunden, bis der X-Server da sein muss
-DIENSTWARTEZEIT="180"     # Sekunden, bis der Streaming-Dienst antworten muss
-BOOTWARTEZEIT="15"        # zusaetzliche Wartezeit direkt nach dem Systemstart
-STARTSCHWELLE="180"       # bis zu dieser Systemlaufzeit gilt es als Systemstart
-PRUEFTAKT="30"            # Sekunden zwischen zwei Pruefungen
-MINDESTVERBINDUNGEN="2"   # TCP-Verbindungen je Fenster zum Streaming-Dienst
-MAXFEHLVERSUCHE="2"       # danach wird das Fenster neu gestartet
-SPERRWARTEZEIT="30"       # Sekunden, die auf eine belegte Sperre gewartet wird
+XWARTEZEIT="120"          # seconds until the X server must be there
+DIENSTWARTEZEIT="180"     # seconds until the streaming service must answer
+BOOTWARTEZEIT="15"        # extra waiting time right after a system start
+STARTSCHWELLE="180"       # up to this uptime it counts as a system start
+PRUEFTAKT="30"            # seconds between two checks
+MINDESTVERBINDUNGEN="2"   # TCP connections per window to the streaming service
+MAXFEHLVERSUCHE="2"       # after this many failures the window is restarted
+SPERRWARTEZEIT="30"       # seconds to wait for a lock held by someone else
 
 BETRIEBSART="ueberwachen"
 LOGDATEI="/dev/null"
@@ -50,9 +49,9 @@ FENSTERANZAHL="0"
 DISPLAY="${DISPLAY:-:0}"
 export DISPLAY
 
-# Wird das Skript aus einem Dienst heraus gestartet (z. B. "Anzeige neu starten"
-# im Dashboard), fehlt die Berechtigung für den X-Server. Die liegt im
-# Heimverzeichnis des angemeldeten Benutzers.
+# When the script is started from a service (for example "restart display" in
+# the dashboard), the permission for the X server is missing. It lives in the
+# home directory of the logged-in user.
 if [ -z "${XAUTHORITY:-}" ]; then
     for _kandidat in "$HOME/.Xauthority" "/home/$(id -un)/.Xauthority"; do
         if [ -r "$_kandidat" ]; then
@@ -63,19 +62,19 @@ if [ -z "${XAUTHORITY:-}" ]; then
     done
 fi
 
-# ---------------------------------------------------------------- Parameter --
+# -------------------------------------------------------------- parameters --
 
 hilfe() {
     printf '%s\n' \
-"CamGrid - Kiosk-Anzeige" \
+"CamGrid - kiosk display" \
 "" \
-"Aufruf:" \
-"  kiosk.sh [Optionen]" \
+"Usage:" \
+"  kiosk.sh [options]" \
 "" \
-"Optionen:" \
-"  --einmal     Fenster starten, danach nicht ueberwachen" \
-"  --neustart   Laufende Fenster beenden und neu starten" \
-"  --help       Diese Hilfe anzeigen"
+"Options:" \
+"  --einmal     Start the windows, then do not watch them" \
+"  --neustart   Stop running windows and start them again" \
+"  --help       Show this help"
 }
 
 NEUSTART="nein"
@@ -85,13 +84,13 @@ while [ $# -gt 0 ]; do
         --neustart) NEUSTART="ja"; shift ;;
         --help|-h)  hilfe; exit 0 ;;
         *)
-            printf 'Unbekannte Option: %s (siehe --help)\n' "$1" >&2
+            printf 'Unknown option: %s (see --help)\n' "$1" >&2
             exit 1
             ;;
     esac
 done
 
-# ---------------------------------------------------------------- Protokoll --
+# ----------------------------------------------------------------- logging --
 
 waehle_logdatei() {
     for kandidat in /var/log/camgrid/kiosk.log \
@@ -117,7 +116,7 @@ protokoll() {
     fi
 }
 
-# ------------------------------------------------------------------- Sperre --
+# -------------------------------------------------------------------- lock --
 
 waehle_sperrdatei() {
     for kandidat in /run/lock/camgrid-kiosk.lock \
@@ -136,16 +135,16 @@ waehle_sperrdatei() {
 
 sperre_belegen() {
     if [ -z "$SPERRDATEI" ]; then
-        protokoll "WARNUNG Keine beschreibbare Sperrdatei gefunden - Mehrfachstart wird nicht verhindert."
+        protokoll "WARNING No writable lock file found - a second start is not prevented."
         return 0
     fi
     if ! command -v flock >/dev/null 2>&1; then
-        protokoll "WARNUNG flock fehlt - Mehrfachstart wird nicht verhindert."
+        protokoll "WARNING flock is missing - a second start is not prevented."
         return 0
     fi
-    # Vorab pruefen: ein fehlgeschlagenes exec wuerde die Shell beenden.
+    # Check first: a failed exec would end the shell.
     if ! : >> "$SPERRDATEI" 2>/dev/null; then
-        protokoll "WARNUNG Sperrdatei $SPERRDATEI nicht beschreibbar - Mehrfachstart wird nicht verhindert."
+        protokoll "WARNING Lock file $SPERRDATEI is not writable - a second start is not prevented."
         return 0
     fi
     exec 9>>"$SPERRDATEI"
@@ -157,11 +156,11 @@ sperre_belegen() {
             return 0
         fi
         if [ "$gemeldet" = "nein" ]; then
-            protokoll "Sperre $SPERRDATEI ist belegt - es wird bis zu $SPERRWARTEZEIT s gewartet."
+            protokoll "Lock $SPERRDATEI is held - waiting up to $SPERRWARTEZEIT s."
             gemeldet="ja"
         fi
         if [ "$gewartet" -ge "$SPERRWARTEZEIT" ]; then
-            protokoll "FEHLER Sperre $SPERRDATEI nach $SPERRWARTEZEIT s noch belegt - Abbruch. Erzwingen mit: kiosk.sh --neustart"
+            protokoll "ERROR Lock $SPERRDATEI still held after $SPERRWARTEZEIT s - aborting. Force it with: kiosk.sh --neustart"
             exit 1
         fi
         sleep 2
@@ -187,7 +186,7 @@ aufraeumen() {
     fi
 }
 
-# ------------------------------------------------------- Beenden alter Teile --
+# ------------------------------------------------------- stop older parts ---
 
 beende_alte_instanz() {
     [ -n "$PIDDATEI" ] || return 0
@@ -201,7 +200,7 @@ beende_alte_instanz() {
         return 0
     fi
     if kill -0 "$alt" 2>/dev/null; then
-        protokoll "Vorherige Instanz (PID $alt) wird beendet."
+        protokoll "Stopping the previous instance (PID $alt)."
         kill "$alt" 2>/dev/null || true
         versuch="0"
         while [ "$versuch" -lt 10 ] && kill -0 "$alt" 2>/dev/null; do
@@ -213,13 +212,13 @@ beende_alte_instanz() {
     rm -f "$PIDDATEI"
 }
 
-# Muster stehen bewusst in Klammern, damit pkill/pgrep nicht die eigene
-# Befehlszeile trifft: "[k]amerawand-fenster" passt nicht auf sich selbst.
+# The patterns are bracketed on purpose, so that pkill/pgrep do not match
+# their own command line: "[k]amerawand-fenster" does not match itself.
 beende_alle_fenster() {
     if ! pgrep -f '[k]amerawand-fenster' >/dev/null 2>&1; then
         return 0
     fi
-    protokoll "Laufende Anzeigefenster werden beendet."
+    protokoll "Stopping running display windows."
     pkill -f '[k]amerawand-fenster' >/dev/null 2>&1 || true
     versuch="0"
     while [ "$versuch" -lt 10 ] && pgrep -f '[k]amerawand-fenster' >/dev/null 2>&1; do
@@ -241,23 +240,23 @@ beende_einzelfenster() {
         done
         kill -9 "$pid" 2>/dev/null || true
     fi
-    # Reste desselben Fensters aufraeumen; ($|[^0-9]) trennt Monitor 1 von 10.
+    # Clean up leftovers of the same window; ($|[^0-9]) keeps monitor 1 and 10 apart.
     pkill -f "[k]amerawand-fenster$nr(\$|[^0-9])" >/dev/null 2>&1 || true
 }
 
-# ------------------------------------------------------------------- Warten --
+# ----------------------------------------------------------------- waiting --
 
 warte_auf_x() {
     gewartet="0"
     while [ "$gewartet" -lt "$XWARTEZEIT" ]; do
         if xset q >/dev/null 2>&1; then
-            protokoll "X-Server erreichbar (DISPLAY=$DISPLAY)."
+            protokoll "X server reachable (DISPLAY=$DISPLAY)."
             return 0
         fi
         sleep 1
         gewartet=$((gewartet + 1))
     done
-    protokoll "FEHLER X-Server nach $XWARTEZEIT s nicht erreichbar (DISPLAY=$DISPLAY) - Abbruch."
+    protokoll "ERROR X server not reachable after $XWARTEZEIT s (DISPLAY=$DISPLAY) - aborting."
     exit 1
 }
 
@@ -270,14 +269,14 @@ warte_nach_systemstart() {
         ''|*[!0-9]*) laufzeit="0" ;;
     esac
     if [ "$laufzeit" -lt "$STARTSCHWELLE" ]; then
-        protokoll "Systemstart erkannt (Laufzeit ${laufzeit} s) - ${BOOTWARTEZEIT} s Wartezeit, sonst haengt Chromium im Zustand D auf der SD-Karte."
+        protokoll "System start detected (uptime ${laufzeit} s) - waiting ${BOOTWARTEZEIT} s, otherwise Chromium hangs in state D on the SD card."
         sleep "$BOOTWARTEZEIT"
     fi
 }
 
 warte_auf_dienst() {
     if ! command -v curl >/dev/null 2>&1; then
-        protokoll "WARNUNG curl fehlt - der Streaming-Dienst kann nicht geprueft werden."
+        protokoll "WARNING curl is missing - the streaming service cannot be checked."
         return 0
     fi
     gewartet="0"
@@ -285,25 +284,25 @@ warte_auf_dienst() {
     while [ "$gewartet" -lt "$DIENSTWARTEZEIT" ]; do
         code=$(curl -s -o /dev/null -m 3 -w '%{http_code}' "$ANZEIGEURL" 2>/dev/null || printf '000')
         if [ "$code" = "200" ]; then
-            protokoll "Streaming-Dienst erreichbar ($ANZEIGEURL)."
+            protokoll "Streaming service reachable ($ANZEIGEURL)."
             return 0
         fi
         sleep 2
         gewartet=$((gewartet + 2))
     done
-    protokoll "FEHLER Streaming-Dienst $ANZEIGEURL nach $DIENSTWARTEZEIT s nicht erreichbar (letzte Antwort: HTTP $code) - Abbruch."
+    protokoll "ERROR Streaming service $ANZEIGEURL not reachable after $DIENSTWARTEZEIT s (last answer: HTTP $code) - aborting."
     exit 1
 }
 
-# --------------------------------------------------------- Monitorangaben ----
+# ----------------------------------------------------------- monitor data ----
 
 feld() {
-    # feld "<zeile>" "<schluessel>" -> Wert oder leer
+    # feld "<line>" "<key>" -> value or empty
     printf '%s' "$1" | tr ';' '\n' | sed -n "s/^$2=//p" | head -n 1
 }
 
 notfallplan() {
-    protokoll "WARNUNG Notfallwerte werden verwendet: ein Monitor ${BREITE_STANDARD}x${HOEHE_STANDARD}@${BILDRATE_STANDARD}."
+    protokoll "WARNING Fallback values are used: one monitor ${BREITE_STANDARD}x${HOEHE_STANDARD}@${BILDRATE_STANDARD}."
     printf 'MONITOR=1;AUSGANG=;X=0;BREITE=%s;HOEHE=%s;BILDRATE=%s;PORT=%s\n' \
         "$BREITE_STANDARD" "$HOEHE_STANDARD" "$BILDRATE_STANDARD" "$ANZEIGEPORT"
 }
@@ -316,15 +315,15 @@ lies_monitorangaben() {
         if CAMGRID_CONFIG="$CONFDATEI" python3 "$KIOSKINFO" > "$rohdatei" 2>/dev/null; then
             :
         else
-            protokoll "WARNUNG $KIOSKINFO konnte nicht ausgefuehrt werden."
+            protokoll "WARNING $KIOSKINFO could not be run."
             : > "$rohdatei"
         fi
     else
-        protokoll "WARNUNG $KIOSKINFO oder python3 fehlt."
+        protokoll "WARNING $KIOSKINFO or python3 is missing."
     fi
 
     if ! grep -q '^MONITOR=' "$rohdatei" 2>/dev/null; then
-        protokoll "WARNUNG Keine Monitorangaben aus $KIOSKINFO erhalten (Konfiguration: $CONFDATEI)."
+        protokoll "WARNING No monitor data received from $KIOSKINFO (configuration: $CONFDATEI)."
         notfallplan > "$rohdatei"
     fi
 
@@ -337,11 +336,11 @@ verbundene_ausgaenge() {
     fi
 }
 
-# Baut aus den Monitorangaben den Anzeigeplan:
-#   <nr>|<ausgang>|<x>|<breite>|<hoehe>|<bildrate>
-# Fehlt der Ausgang in der Konfiguration, wird der naechste freie verbundene
-# Ausgang in der Reihenfolge von xrandr genommen. X wird fortlaufend aus den
-# Breiten gebildet, damit es zur Anordnung mit --right-of passt.
+# Builds the display plan from the monitor data:
+#   <no>|<output>|<x>|<width>|<height>|<refresh rate>
+# If the output is missing in the configuration, the next free connected
+# output in xrandr order is taken. X is derived from the widths one after
+# another, so that it matches the arrangement with --right-of.
 erstelle_plan() {
     rohdatei="$1"
     PLANDATEI="$TMPVERZ/plan.txt"
@@ -349,9 +348,9 @@ erstelle_plan() {
 
     frei=$(verbundene_ausgaenge)
     if [ -z "$frei" ]; then
-        protokoll "WARNUNG xrandr meldet keine verbundenen Ausgaenge."
+        protokoll "WARNING xrandr reports no connected outputs."
     else
-        protokoll "Verbundene Ausgaenge: $frei"
+        protokoll "Connected outputs: $frei"
     fi
 
     xnaechste="0"
@@ -375,7 +374,7 @@ erstelle_plan() {
         esac
 
         case "${nr:-}" in
-            ''|*[!0-9]*) protokoll "WARNUNG Zeile ohne gueltige Monitornummer wird uebergangen: $zeile"; continue ;;
+            ''|*[!0-9]*) protokoll "WARNING Line without a valid monitor number is skipped: $zeile"; continue ;;
         esac
         case "${breite:-}" in ''|*[!0-9]*) breite="$BREITE_STANDARD" ;; esac
         case "${hoehe:-}" in ''|*[!0-9]*) hoehe="$HOEHE_STANDARD" ;; esac
@@ -384,9 +383,9 @@ erstelle_plan() {
         if [ -z "${aus:-}" ]; then
             aus=$(printf '%s' "$frei" | awk '{print $1}')
             if [ -z "$aus" ]; then
-                protokoll "WARNUNG Monitor $nr: kein Ausgang konfiguriert und kein freier verbundener Ausgang vorhanden."
+                protokoll "WARNING Monitor $nr: no output configured and no free connected output available."
             else
-                protokoll "Monitor $nr: kein Ausgang konfiguriert, es wird $aus verwendet."
+                protokoll "Monitor $nr: no output configured, $aus is used."
                 frei=$(printf '%s' "$frei" | awk '{ $1=""; sub(/^ +/, ""); print }')
             fi
         else
@@ -394,7 +393,7 @@ erstelle_plan() {
         fi
 
         if [ -n "${xkonf:-}" ] && [ "$xkonf" != "$xnaechste" ]; then
-            protokoll "Hinweis Monitor $nr: X=$xkonf aus der Konfiguration weicht von der Anordnung ab, es gilt X=$xnaechste."
+            protokoll "Note Monitor $nr: X=$xkonf from the configuration differs from the arrangement, X=$xnaechste is used."
         fi
 
         printf '%s|%s|%s|%s|%s|%s\n' "$nr" "${aus:-}" "$xnaechste" "$breite" "$hoehe" "$rate" >> "$PLANDATEI"
@@ -403,27 +402,27 @@ erstelle_plan() {
     done < "$rohdatei"
 
     if [ "$FENSTERANZAHL" -eq 0 ]; then
-        protokoll "WARNUNG Anzeigeplan ist leer - Notfallwerte werden verwendet."
+        protokoll "WARNING The display plan is empty - fallback values are used."
         printf '1|%s|0|%s|%s|%s\n' \
             "$(printf '%s' "$(verbundene_ausgaenge)" | awk '{print $1}')" \
             "$BREITE_STANDARD" "$HOEHE_STANDARD" "$BILDRATE_STANDARD" "$ANZEIGEPORT" > "$PLANDATEI"
         FENSTERANZAHL="1"
     fi
-    protokoll "Anzeigeplan: $FENSTERANZAHL Fenster."
+    protokoll "Display plan: $FENSTERANZAHL window(s)."
 }
 
-# ------------------------------------------------------------- Bildschirme ---
+# ------------------------------------------------------------------ screens --
 
 richte_bildschirme_ein() {
     if ! command -v xrandr >/dev/null 2>&1; then
-        protokoll "WARNUNG xrandr fehlt - die Bildschirme werden nicht eingestellt."
+        protokoll "WARNING xrandr is missing - the screens are not configured."
         return 0
     fi
 
     vorher=""
     while IFS='|' read -r nr aus x breite hoehe rate; do
         if [ -z "$aus" ]; then
-            protokoll "WARNUNG Monitor $nr: kein Ausgang - xrandr wird uebersprungen."
+            protokoll "WARNING Monitor $nr: no output - xrandr is skipped."
             continue
         fi
         modus="${breite}x${hoehe}"
@@ -435,12 +434,12 @@ richte_bildschirme_ein() {
 
         # shellcheck disable=SC2086
         if xrandr --output "$aus" --mode "$modus" --rate "$rate" $lage >/dev/null 2>&1; then
-            protokoll "Monitor $nr: Ausgang $aus auf ${modus}@${rate} gesetzt (X=$x)."
+            protokoll "Monitor $nr: output $aus set to ${modus}@${rate} (X=$x)."
         # shellcheck disable=SC2086
         elif xrandr --output "$aus" --mode "$modus" $lage >/dev/null 2>&1; then
-            protokoll "WARNUNG Monitor $nr: Bildrate $rate am Ausgang $aus nicht moeglich, ${modus} mit Standardrate gesetzt."
+            protokoll "WARNING Monitor $nr: refresh rate $rate not possible on output $aus, ${modus} set with the default rate."
         else
-            protokoll "WARNUNG Monitor $nr: ${modus}@${rate} am Ausgang $aus nicht moeglich - vorhandene Einstellung bleibt. Hinweis: 4K laeuft hier nur mit 30 Hz und ueberlastet das Geraet."
+            protokoll "WARNING Monitor $nr: ${modus}@${rate} not possible on output $aus - the existing setting stays. Note: 4K runs here only at 30 Hz and overloads the device."
         fi
         vorher="$aus"
     done < "$PLANDATEI"
@@ -448,20 +447,20 @@ richte_bildschirme_ein() {
 
 schalte_bildschirmschoner_aus() {
     if ! command -v xset >/dev/null 2>&1; then
-        protokoll "WARNUNG xset fehlt - Bildschirmschoner bleibt aktiv."
+        protokoll "WARNING xset is missing - the screen saver stays active."
         return 0
     fi
     if xset s off -dpms s noblank >/dev/null 2>&1; then
-        protokoll "Bildschirmschoner und Energiesparen abgeschaltet."
+        protokoll "Screen saver and power saving switched off."
     else
         xset s off >/dev/null 2>&1 || true
         xset -dpms >/dev/null 2>&1 || true
         xset s noblank >/dev/null 2>&1 || true
-        protokoll "Bildschirmschoner abgeschaltet (einzelne Aufrufe)."
+        protokoll "Screen saver switched off (one call at a time)."
     fi
 }
 
-# ---------------------------------------------------------------- Chromium ---
+# ----------------------------------------------------------------- Chromium --
 
 finde_chromium() {
     for kandidat in chromium chromium-browser /usr/bin/chromium /usr/bin/chromium-browser; do
@@ -473,8 +472,8 @@ finde_chromium() {
     return 1
 }
 
-# Chromium startet nach hartem Ausschalten mit leerem Fenster, wenn im Profil
-# noch "exit_type":"Crashed" steht.
+# Chromium comes up with an empty window after a hard power-off when the
+# profile still holds "exit_type":"Crashed".
 normalisiere_profil() {
     einstellungen="$1/Default/Preferences"
     [ -f "$einstellungen" ] || return 0
@@ -521,7 +520,7 @@ starte_fenster() {
 
     eval "PID_$nr=\$neuepid"
     eval "FEHLER_$nr=0"
-    protokoll "Monitor $nr: Fenster gestartet (PID $neuepid, Position ${x},0, Groesse ${breite}x${hoehe})."
+    protokoll "Monitor $nr: window started (PID $neuepid, position ${x},0, size ${breite}x${hoehe})."
 }
 
 starte_alle_fenster() {
@@ -531,9 +530,9 @@ starte_alle_fenster() {
     done < "$PLANDATEI"
 }
 
-# --------------------------------------------------------------- Ueberwachung -
+# --------------------------------------------------------------- monitoring --
 
-# Gibt PID und alle Nachkommen aus (ein einziger ps-Abzug als Grundlage).
+# Prints the PID and all of its descendants (based on a single ps snapshot).
 nachkommen() {
     awk -v wurzel="$1" '
         { kinder[NR]=$1; elter[$1]=$2; anzahl=NR }
@@ -554,7 +553,7 @@ nachkommen() {
         }' "$2"
 }
 
-# Zaehlt hergestellte TCP-Verbindungen des Fensters zum Streaming-Dienst.
+# Counts established TCP connections from the window to the streaming service.
 zaehle_verbindungen() {
     hauptpid="$1"
     psdatei="$2"
@@ -583,10 +582,10 @@ zaehle_verbindungen() {
 
 ueberwache() {
     if ! command -v ss >/dev/null 2>&1; then
-        protokoll "WARNUNG ss fehlt - es wird nur geprueft, ob die Fenster laufen."
+        protokoll "WARNING ss is missing - only the presence of the windows is checked."
         PIDZUORDNUNG="aus"
     fi
-    protokoll "Dauerueberwachung beginnt (Pruefung alle ${PRUEFTAKT} s, mindestens ${MINDESTVERBINDUNGEN} Verbindungen je Fenster)."
+    protokoll "Continuous monitoring starts (check every ${PRUEFTAKT} s, at least ${MINDESTVERBINDUNGEN} connections per window)."
 
     ssdatei="$TMPVERZ/ss.txt"
     psdatei="$TMPVERZ/ps.txt"
@@ -600,7 +599,7 @@ ueberwache() {
                 | grep -F "127.0.0.1:$ANZEIGEPORT" > "$ssdatei" 2>/dev/null || : > "$ssdatei"
             if [ -s "$ssdatei" ] && ! grep -q 'pid=' "$ssdatei" 2>/dev/null; then
                 if [ "$PIDZUORDNUNG" = "ja" ]; then
-                    protokoll "WARNUNG ss liefert keine Prozesszuordnung - es wird die Gesamtzahl der Verbindungen geprueft."
+                    protokoll "WARNING ss does not report the owning process - the total number of connections is checked instead."
                     PIDZUORDNUNG="gesamt"
                 fi
             fi
@@ -621,18 +620,18 @@ ueberwache() {
 
             if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
                 inordnung="nein"
-                grund="Prozess laeuft nicht"
+                grund="process is not running"
             elif [ "$PIDZUORDNUNG" = "ja" ]; then
                 anzahl=$(zaehle_verbindungen "$pid" "$psdatei" "$ssdatei")
                 if [ "$anzahl" -lt "$MINDESTVERBINDUNGEN" ]; then
                     inordnung="nein"
-                    grund="nur $anzahl Verbindung(en) zu 127.0.0.1:$ANZEIGEPORT"
+                    grund="only $anzahl connection(s) to 127.0.0.1:$ANZEIGEPORT"
                 fi
             elif [ "$PIDZUORDNUNG" = "gesamt" ]; then
                 noetig=$((MINDESTVERBINDUNGEN * FENSTERANZAHL))
                 if [ "$gesamt" -lt "$noetig" ]; then
                     inordnung="nein"
-                    grund="insgesamt nur $gesamt von $noetig erwarteten Verbindungen"
+                    grund="only $gesamt of $noetig expected connections in total"
                 fi
             fi
 
@@ -641,9 +640,9 @@ ueberwache() {
             else
                 fehl=$((fehl + 1))
                 eval "FEHLER_$nr=\$fehl"
-                protokoll "WARNUNG Monitor $nr: $grund (Fehlversuch $fehl von $MAXFEHLVERSUCHE)."
+                protokoll "WARNING Monitor $nr: $grund (failure $fehl of $MAXFEHLVERSUCHE)."
                 if [ "$fehl" -ge "$MAXFEHLVERSUCHE" ]; then
-                    protokoll "Monitor $nr wird neu gestartet."
+                    protokoll "Monitor $nr is being restarted."
                     beende_einzelfenster "$nr" "$pid"
                     starte_fenster "$nr" "$x" "$breite" "$hoehe"
                 fi
@@ -652,34 +651,36 @@ ueberwache() {
     done
 }
 
-# ------------------------------------------------------------------- Ablauf --
+# --------------------------------------------------------------------- flow --
 
 waehle_logdatei
 waehle_sperrdatei
 
-protokoll "Start (Betriebsart: $BETRIEBSART, Neustart: $NEUSTART)."
+if [ "$BETRIEBSART" = "einmal" ]; then _art="once"; else _art="watch"; fi
+if [ "$NEUSTART" = "ja" ]; then _neustart="yes"; else _neustart="no"; fi
+protokoll "Start (mode: $_art, restart: $_neustart)."
 
 if [ "$NEUSTART" = "ja" ]; then
-    # Erst die alte Instanz beenden, damit die Sperre frei wird.
+    # Stop the old instance first, so that the lock becomes free.
     beende_alte_instanz
     beende_alle_fenster
 fi
 
 sperre_belegen
 trap 'aufraeumen' EXIT
-trap 'protokoll "Signal empfangen - Ende."; exit 0' INT TERM
+trap 'protokoll "Signal received - end."; exit 0' INT TERM
 schreibe_pidkennung
 
 TMPVERZ=$(mktemp -d 2>/dev/null || printf '%s' "/tmp/camgrid-kiosk.$$")
 mkdir -p "$TMPVERZ" 2>/dev/null || true
 if [ ! -d "$TMPVERZ" ]; then
-    protokoll "FEHLER Arbeitsverzeichnis konnte nicht angelegt werden - Abbruch."
+    protokoll "ERROR The work directory could not be created - aborting."
     exit 1
 fi
 
 CHROMIUM=$(finde_chromium || true)
 if [ -z "$CHROMIUM" ]; then
-    protokoll "FEHLER Chromium nicht gefunden (weder chromium noch chromium-browser) - Abbruch."
+    protokoll "ERROR Chromium not found (neither chromium nor chromium-browser) - aborting."
     exit 1
 fi
 
@@ -700,7 +701,7 @@ beende_alle_fenster
 starte_alle_fenster
 
 if [ "$BETRIEBSART" = "einmal" ]; then
-    protokoll "Betriebsart --einmal: keine Ueberwachung, Ende."
+    protokoll "Mode --einmal: no monitoring, end."
     exit 0
 fi
 

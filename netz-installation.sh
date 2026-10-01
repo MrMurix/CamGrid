@@ -1,19 +1,19 @@
 #!/bin/sh
-# CamGrid - Installation in einem Befehl.
+# CamGrid - installation in a single command.
 #
-# Holt das Projekt von GitHub nach /opt/camgrid-quelle (oder aktualisiert
-# eine vorhandene Kopie) und startet danach install.sh. Alle weiteren
-# Parameter werden unveraendert an install.sh weitergegeben.
+# Fetches the project from GitHub into /opt/camgrid-quelle (or updates an
+# existing copy) and then runs install.sh. All further parameters are passed
+# on to install.sh unchanged.
 #
-# Aufruf:
+# Usage:
 #   curl -fsSL https://raw.githubusercontent.com/MrMurix/CamGrid/main/netz-installation.sh | sudo sh
 #
-# Mit Parametern fuer install.sh (das -s -- ist dabei wichtig):
+# With parameters for install.sh (the -s -- part matters):
 #   curl -fsSL .../netz-installation.sh | sudo sh -s -- --no-kiosk --port 8090
 set -eu
 
-# PLATZHALTER durch den eigenen GitHub-Benutzernamen ersetzen.
-GITHUB_BENUTZER="PLATZHALTER"
+# Replace PLACEHOLDER with your own GitHub user name.
+GITHUB_BENUTZER="PLACEHOLDER"
 PROJEKTNAME="camgrid"
 ZWEIG="main"
 
@@ -25,46 +25,46 @@ meldung() {
 }
 
 warnung() {
-    printf '[camgrid] Warnung: %s\n' "$1" >&2
+    printf '[camgrid] Warning: %s\n' "$1" >&2
 }
 
 fehler() {
-    printf '[camgrid] Fehler: %s\n' "$1" >&2
+    printf '[camgrid] Error: %s\n' "$1" >&2
     exit 1
 }
 
 hilfe() {
     printf '%s\n' \
-"CamGrid - Installation in einem Befehl" \
+"CamGrid - installation in a single command" \
 "" \
-"Aufruf:" \
+"Usage:" \
 "  curl -fsSL https://raw.githubusercontent.com/$GITHUB_BENUTZER/$PROJEKTNAME/$ZWEIG/netz-installation.sh | sudo sh" \
 "" \
-"Mit Parametern fuer install.sh:" \
+"With parameters for install.sh:" \
 "  curl -fsSL .../netz-installation.sh | sudo sh -s -- --no-kiosk --port 8090" \
 "" \
-"Eigene Optionen:" \
-"  --repo ADRESSE    Git-Adresse des Projekts (sonst GitHub, siehe oben)" \
-"  --zweig NAME      Zweig (Standard: $ZWEIG)" \
-"  --quelle VERZ     Ablage der Arbeitskopie (Standard: $QUELLVERZ)" \
-"  --hilfe, --help   Diese Hilfe anzeigen" \
+"Own options:" \
+"  --repo ADDRESS    Git address of the project (otherwise GitHub, see above)" \
+"  --zweig NAME      Branch (default: $ZWEIG)" \
+"  --quelle DIR      Where the working copy is kept (default: $QUELLVERZ)" \
+"  --hilfe, --help   Show this help" \
 "" \
-"Alle anderen Optionen gehen an install.sh weiter, zum Beispiel:" \
+"All other options are passed on to install.sh, for example:" \
 "  --user NAME  --no-kiosk  --port N  --dry-run  --version" \
 "" \
-"Ablauf:" \
-"  1. git pruefen und notfalls installieren (apt, dnf, pacman, zypper, brew)" \
-"  2. Projekt nach $QUELLVERZ klonen oder per git pull aktualisieren" \
-"  3. sh $QUELLVERZ/install.sh mit den uebergebenen Parametern starten" \
+"Steps:" \
+"  1. Check for git and install it if needed (apt, dnf, pacman, zypper, brew)" \
+"  2. Clone the project into $QUELLVERZ or update it with git pull" \
+"  3. Run sh $QUELLVERZ/install.sh with the given parameters" \
 "" \
-"Statt der Umgebungsvariable CAMGRID_REPO kann auch --repo verwendet werden."
+"Instead of the environment variable CAMGRID_REPO you can also use --repo."
 }
 
-# --------------------------------------------------------------- Parameter ---
+# -------------------------------------------------------------- parameters ---
 
-# Eigene Optionen herausfiltern, alle uebrigen in der urspruenglichen Form
-# fuer install.sh behalten. Dazu wird die Parameterliste einmal durchgedreht:
-# jeder fremde Parameter wird hinten wieder angehaengt.
+# Filter out the own options and keep all remaining ones in their original
+# form for install.sh. The parameter list is rotated once: every foreign
+# parameter is appended at the end again.
 UEBRIG=$#
 while [ "$UEBRIG" -gt 0 ]; do
     arg="$1"
@@ -76,22 +76,22 @@ while [ "$UEBRIG" -gt 0 ]; do
             exit 0
             ;;
         --repo)
-            [ "$UEBRIG" -ge 1 ] || fehler "--repo benoetigt eine Adresse."
+            [ "$UEBRIG" -ge 1 ] || fehler "--repo needs an address."
             REPO="$1"; shift; UEBRIG=$((UEBRIG - 1)) ;;
         --repo=*)
             REPO="${arg#--repo=}" ;;
         --zweig)
-            [ "$UEBRIG" -ge 1 ] || fehler "--zweig benoetigt einen Namen."
+            [ "$UEBRIG" -ge 1 ] || fehler "--zweig needs a name."
             ZWEIG="$1"; shift; UEBRIG=$((UEBRIG - 1)) ;;
         --zweig=*)
             ZWEIG="${arg#--zweig=}" ;;
         --quelle)
-            [ "$UEBRIG" -ge 1 ] || fehler "--quelle benoetigt ein Verzeichnis."
+            [ "$UEBRIG" -ge 1 ] || fehler "--quelle needs a directory."
             QUELLVERZ="$1"; shift; UEBRIG=$((UEBRIG - 1)) ;;
         --quelle=*)
             QUELLVERZ="${arg#--quelle=}" ;;
         *)
-            # Unveraendert an install.sh weitergeben.
+            # Pass on to install.sh unchanged.
             set -- "$@" "$arg" ;;
     esac
 done
@@ -100,37 +100,37 @@ if [ -z "$REPO" ]; then
     REPO="https://github.com/$GITHUB_BENUTZER/$PROJEKTNAME.git"
 fi
 
-# ------------------------------------------------------------ Vorbedingungen -
+# ----------------------------------------------------------- prerequisites ---
 
-[ "$(id -u)" = "0" ] || fehler "Bitte mit Root-Rechten starten, zum Beispiel: curl -fsSL ... | sudo sh"
+[ "$(id -u)" = "0" ] || fehler "Please run with root rights, for example: curl -fsSL ... | sudo sh"
 
-kern=$(uname -s 2>/dev/null || printf 'unbekannt')
+kern=$(uname -s 2>/dev/null || printf 'unknown')
 case "$kern" in
     Linux|Darwin) : ;;
-    *) fehler "Dieses Skript ist fuer Linux und macOS. Fuer Windows: install.ps1 verwenden." ;;
+    *) fehler "This script is for Linux and macOS. For Windows use install.ps1." ;;
 esac
 
-# Steht im Repo noch der Platzhalter, kann nichts geklont werden - ausser es
-# liegt schon eine Arbeitskopie mit eigener Adresse vor.
+# If the repository still holds the placeholder, nothing can be cloned -
+# unless a working copy with its own address is already there.
 pruefe_platzhalter() {
     case "$REPO" in
-        *PLATZHALTER*) : ;;
+        *PLACEHOLDER*) : ;;
         *) return 0 ;;
     esac
     if [ -d "$QUELLVERZ/.git" ]; then
-        warnung "Die Projektadresse enthaelt noch den Platzhalter 'PLATZHALTER'."
-        warnung "Es wird die vorhandene Arbeitskopie in $QUELLVERZ verwendet."
+        warnung "The project address still contains the placeholder PLACEHOLDER."
+        warnung "The existing working copy in $QUELLVERZ is used instead."
         REPO=""
         return 0
     fi
     printf '\n' >&2
-    printf '[camgrid] Die Projektadresse ist noch nicht eingetragen:\n' >&2
+    printf '[camgrid] The project address is not set yet:\n' >&2
     printf '    %s\n' "$REPO" >&2
-    printf '[camgrid] In netz-installation.sh muss PLATZHALTER durch den eigenen\n' >&2
-    printf '[camgrid] GitHub-Benutzernamen ersetzt werden (Zeile GITHUB_BENUTZER).\n' >&2
-    printf '[camgrid] Sofort loesbar ohne Aenderung der Datei:\n' >&2
+    printf '[camgrid] In netz-installation.sh, PLACEHOLDER must be replaced with your\n' >&2
+    printf '[camgrid] own GitHub user name (line GITHUB_BENUTZER).\n' >&2
+    printf '[camgrid] Quick fix without editing the file:\n' >&2
     printf '    curl -fsSL ... | sudo sh -s -- --repo https://github.com/NAME/camgrid.git\n' >&2
-    printf '    oder: CAMGRID_REPO=https://github.com/NAME/camgrid.git sudo -E sh netz-installation.sh\n' >&2
+    printf '    or: CAMGRID_REPO=https://github.com/NAME/camgrid.git sudo -E sh netz-installation.sh\n' >&2
     printf '\n' >&2
     exit 1
 }
@@ -139,7 +139,7 @@ pruefe_platzhalter() {
 
 installiere_git() {
     command -v git >/dev/null 2>&1 && return 0
-    meldung "git fehlt und wird installiert ..."
+    meldung "git is missing and will be installed ..."
     if command -v apt-get >/dev/null 2>&1; then
         DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends git >/dev/null 2>&1 || true
@@ -150,66 +150,66 @@ installiere_git() {
     elif command -v zypper >/dev/null 2>&1; then
         zypper --non-interactive install git >/dev/null 2>&1 || true
     elif [ "$kern" = "Darwin" ]; then
-        # Auf macOS bringt git die Xcode-Kommandozeile mit.
+        # On macOS git comes with the Xcode command line tools.
         xcode-select --install >/dev/null 2>&1 || true
-        warnung "Bitte die Installation der Xcode-Kommandozeilenwerkzeuge bestaetigen."
+        warnung "Please confirm the installation of the Xcode command line tools."
     fi
     command -v git >/dev/null 2>&1 \
-        || fehler "git konnte nicht installiert werden. Bitte von Hand installieren und erneut starten."
-    meldung "git ist vorhanden: $(git --version 2>/dev/null || printf 'git')"
+        || fehler "git could not be installed. Please install it by hand and start again."
+    meldung "git is present: $(git --version 2>/dev/null || printf 'git')"
 }
 
-# ------------------------------------------------------------- Arbeitskopie --
+# ------------------------------------------------------------ working copy --
 
 hole_projekt() {
     if [ -d "$QUELLVERZ/.git" ]; then
-        meldung "Vorhandene Arbeitskopie wird aktualisiert: $QUELLVERZ"
+        meldung "Updating the existing working copy: $QUELLVERZ"
         if [ -n "$REPO" ]; then
             git -C "$QUELLVERZ" remote set-url origin "$REPO" >/dev/null 2>&1 || true
         fi
         git -C "$QUELLVERZ" fetch --depth 1 origin "$ZWEIG" >/dev/null 2>&1 \
-            || warnung "git fetch war nicht erfolgreich - es wird mit dem vorhandenen Stand gearbeitet."
+            || warnung "git fetch was not successful - the existing state is used."
         if ! git -C "$QUELLVERZ" reset --hard "origin/$ZWEIG" >/dev/null 2>&1; then
             git -C "$QUELLVERZ" pull --ff-only >/dev/null 2>&1 \
-                || warnung "git pull war nicht erfolgreich - es wird mit dem vorhandenen Stand gearbeitet."
+                || warnung "git pull was not successful - the existing state is used."
         fi
     else
         if [ -d "$QUELLVERZ" ] && [ -n "$(ls -A "$QUELLVERZ" 2>/dev/null || true)" ]; then
-            fehler "$QUELLVERZ ist vorhanden, aber keine Arbeitskopie. Bitte umbenennen oder --quelle angeben."
+            fehler "$QUELLVERZ exists but is not a working copy. Please rename it or pass --quelle."
         fi
-        meldung "Projekt wird geholt: $REPO (Zweig $ZWEIG)"
+        meldung "Fetching the project: $REPO (branch $ZWEIG)"
         mkdir -p "$(dirname "$QUELLVERZ")"
         if ! git clone --depth 1 --branch "$ZWEIG" "$REPO" "$QUELLVERZ" >/dev/null 2>&1; then
             rm -rf "$QUELLVERZ"
-            fehler "Das Projekt konnte nicht geklont werden: $REPO (Zweig $ZWEIG)"
+            fehler "The project could not be cloned: $REPO (branch $ZWEIG)"
         fi
     fi
 
     [ -f "$QUELLVERZ/install.sh" ] \
-        || fehler "$QUELLVERZ/install.sh fehlt - ist das die richtige Projektadresse?"
+        || fehler "$QUELLVERZ/install.sh is missing - is the project address correct?"
     chmod 0755 "$QUELLVERZ/install.sh" 2>/dev/null || true
-    meldung "Stand: $(git -C "$QUELLVERZ" log -1 --format='%h %ad' --date=short 2>/dev/null || printf 'unbekannt')"
+    meldung "State: $(git -C "$QUELLVERZ" log -1 --format='%h %ad' --date=short 2>/dev/null || printf 'unknown')"
 }
 
-# ------------------------------------------------------------------- Ablauf --
+# --------------------------------------------------------------------- flow --
 
 pruefe_platzhalter
 installiere_git
 hole_projekt
 
-meldung "install.sh wird gestartet ..."
+meldung "Starting install.sh ..."
 if [ $# -gt 0 ]; then
-    meldung "Parameter: $*"
+    meldung "Parameters: $*"
 fi
 printf '\n'
 
 cd "$QUELLVERZ"
-# Ohne "|| ergebnis=$?" wuerde set -e hier sofort abbrechen.
+# Without "|| ergebnis=$?" set -e would abort right here.
 ergebnis=0
 sh "$QUELLVERZ/install.sh" "$@" || ergebnis=$?
 
 if [ "$ergebnis" = "0" ]; then
-    meldung "Arbeitskopie fuer spaetere Aktualisierungen: $QUELLVERZ"
-    meldung "Aktualisieren: sudo sh $QUELLVERZ/netz-installation.sh"
+    meldung "Working copy for later updates: $QUELLVERZ"
+    meldung "Update with: sudo sh $QUELLVERZ/netz-installation.sh"
 fi
 exit "$ergebnis"

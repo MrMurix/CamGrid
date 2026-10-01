@@ -1,16 +1,16 @@
-# CamGrid - Installation unter Windows
+# CamGrid - installation on Windows
 #
-# Richtet die Konfiguration und den Autostart ein. Es werden keine
-# Adminrechte benoetigt: ohne Adminrechte liegt die Konfiguration unter
-# %LOCALAPPDATA%\CamGrid, mit Adminrechten unter %ProgramData%\CamGrid.
+# Sets up the configuration and the autostart entry. Admin rights are not
+# needed: without admin rights the configuration lives in
+# %LOCALAPPDATA%\CamGrid, with admin rights in %ProgramData%\CamGrid.
 #
-# Aufruf (PowerShell 5.1 oder neuer):
+# Usage (PowerShell 5.1 or newer):
 #   powershell -ExecutionPolicy Bypass -File install.ps1
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Port 8090
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall
 #
-# Alle Meldungen sind auf Deutsch, die Datei selbst bewusst ohne Umlaute,
-# damit sie unabhaengig von der Zeichensatzeinstellung lesbar bleibt.
+# All messages are in English and the file deliberately uses plain ASCII, so
+# that it stays readable no matter which code page is active.
 
 [CmdletBinding()]
 param(
@@ -23,7 +23,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Feste Startzugangsdaten - muessen nach dem ersten Anmelden geaendert werden.
+# Fixed initial credentials - must be changed after the first login.
 $StandardBenutzer = 'admin'
 $StandardPasswort = 'camgrid'
 $AnzeigePort      = 1984
@@ -31,12 +31,12 @@ $Aufgabenname     = 'CamGrid'
 $Projekt          = $PSScriptRoot
 if (-not $Projekt) { $Projekt = (Get-Location).Path }
 
-# ------------------------------------------------------------------ Ausgaben -
+# ------------------------------------------------------------------- output --
 
 function Meldung($text)  { Write-Host "[camgrid] $text" }
-function Warnung($text)  { Write-Host "[camgrid] Warnung: $text" -ForegroundColor Yellow }
+function Warnung($text)  { Write-Host "[camgrid] Warning: $text" -ForegroundColor Yellow }
 function Fehler($text) {
-    Write-Host "[camgrid] Fehler: $text" -ForegroundColor Red
+    Write-Host "[camgrid] Error: $text" -ForegroundColor Red
     exit 1
 }
 
@@ -46,41 +46,41 @@ function Projektversion {
         $wert = (Get-Content $datei -TotalCount 1).Trim()
         if ($wert) { return $wert }
     }
-    return 'unbekannt'
+    return 'unknown'
 }
 
 function Hilfe {
     $v = Projektversion
     Write-Host @"
-CamGrid - Installation unter Windows (Version $v)
+CamGrid - installation on Windows (version $v)
 
-Aufruf:
-  powershell -ExecutionPolicy Bypass -File install.ps1 [Optionen]
+Usage:
+  powershell -ExecutionPolicy Bypass -File install.ps1 [options]
 
-Optionen:
-  -Port N        Port der Verwaltung (Standard: 8080)
-  -NoAutostart   Keine geplante Aufgabe fuer den Autostart anlegen
-  -DryRun        Nur anzeigen, was getan wuerde - aendert nichts
-  -Uninstall     Autostart entfernen und nach der Konfiguration fragen
-  -Help          Diese Hilfe anzeigen
+Options:
+  -Port N        Port of the admin interface (default: 8080)
+  -NoAutostart   Do not create a scheduled task for the autostart
+  -DryRun        Only show what would be done - changes nothing
+  -Uninstall     Remove the autostart and ask about the configuration
+  -Help          Show this help
 
-Was das Skript tut:
-  1. Python 3 pruefen (Hinweis auf 'winget install Python.Python.3.12', falls es fehlt)
-  2. Konfiguration anlegen, falls noch keine vorhanden ist (wird nie ueberschrieben)
-  3. Autostart als geplante Aufgabe 'CamGrid' bei der Anmeldung einrichten
-  4. Adressen und Zugangsdaten ausgeben
+What the script does:
+  1. Check for Python 3 (points to 'winget install Python.Python.3.12' if missing)
+  2. Create the configuration if there is none yet (it is never overwritten)
+  3. Set up the autostart as the scheduled task 'CamGrid' at logon
+  4. Print the addresses and credentials
 
-Adminrechte sind nicht notwendig. Ohne Adminrechte liegen Konfiguration und
-Protokolle unter %LOCALAPPDATA%\CamGrid, mit Adminrechten unter
+Admin rights are not required. Without them the configuration and the logs
+live under %LOCALAPPDATA%\CamGrid, with admin rights under
 %ProgramData%\CamGrid.
 
-Zum Ausprobieren ohne Installation: start-lokal.cmd
+To try it out without installing: start-lokal.cmd
 "@
 }
 
 if ($Help) { Hilfe; exit 0 }
 
-# --------------------------------------------------------------- Umgebung ----
+# -------------------------------------------------------------- environment --
 
 function IstAdmin {
     $kennung = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -95,7 +95,7 @@ function Datenverzeichnis {
     return (Join-Path $env:LOCALAPPDATA 'CamGrid')
 }
 
-# Sucht Python 3. Rueckgabe: Objekt mit Python (python.exe) und Pythonw.
+# Looks for Python 3. Returns an object with Python (python.exe) and Pythonw.
 function FindePython {
     $kandidaten = @()
     foreach ($name in 'py','python','python3') {
@@ -128,11 +128,11 @@ function FindePython {
 }
 
 function PythonHinweis {
-    Warnung 'Python 3 wurde nicht gefunden.'
-    Meldung 'Installation zum Beispiel so:'
+    Warnung 'Python 3 was not found.'
+    Meldung 'Install it for example with:'
     Meldung '  winget install Python.Python.3.12'
-    Meldung 'Alternativ von https://www.python.org/downloads/windows/ laden und'
-    Meldung 'dabei "Add python.exe to PATH" ankreuzen. Danach install.ps1 erneut starten.'
+    Meldung 'Or download it from https://www.python.org/downloads/windows/ and tick'
+    Meldung '"Add python.exe to PATH". Then run install.ps1 again.'
 }
 
 function EigeneIpAdresse {
@@ -144,15 +144,15 @@ function EigeneIpAdresse {
             }
         }
     } catch {
-        # Ohne Netzwerk bleibt es beim Platzhalter.
+        # Without a network the placeholder stays.
     }
-    return '<ip-adresse>'
+    return '<ip-address>'
 }
 
-# ----------------------------------------------------------- Konfiguration ---
+# ----------------------------------------------------------- configuration ---
 
-# Erzeugt die Startkonfiguration mit app/config.py. Eine vorhandene Datei
-# wird niemals angefasst.
+# Creates the initial configuration with app/config.py. An existing file is
+# never touched.
 function ErzeugeKonfiguration($python, $ziel, $port) {
     $skript = Join-Path $env:TEMP 'camgrid-konfig.py'
     $inhalt = @'
@@ -165,8 +165,8 @@ sys.path.insert(0, projekt)
 try:
     from app import config as konfig
     daten = konfig.standard_konfiguration()
-except Exception as fehler:                      # Notfall: Minimalfassung
-    print("Hinweis: app/config.py nicht nutzbar (%s) - Minimalfassung." % fehler)
+except Exception as fehler:                      # fallback: minimal version
+    print("Note: app/config.py is not usable (%s) - minimal version." % fehler)
     daten = {
         "version": 1,
         "anlage": {"name": "CamGrid"},
@@ -192,13 +192,13 @@ os.makedirs(os.path.dirname(ziel), exist_ok=True)
 with open(ziel, "w", encoding="utf-8") as datei:
     json.dump(daten, datei, indent=2, ensure_ascii=False)
     datei.write("\n")
-print("Konfiguration geschrieben: %s" % ziel)
+print("Configuration written: %s" % ziel)
 '@
     Set-Content -Path $skript -Value $inhalt -Encoding UTF8
     try {
         $ausgabe = & $python $skript $Projekt $ziel $port $AnzeigePort $StandardBenutzer $StandardPasswort
         if ($LASTEXITCODE -ne 0) {
-            Warnung 'Die Konfiguration konnte nicht erzeugt werden.'
+            Warnung 'The configuration could not be created.'
             foreach ($zeile in $ausgabe) { Warnung $zeile }
             return $false
         }
@@ -209,7 +209,7 @@ print("Konfiguration geschrieben: %s" % ziel)
     }
 }
 
-# Liest einen Zahlenwert aus der Konfiguration, ohne Python zu starten.
+# Reads a numeric value from the configuration without starting Python.
 function LiesPort($datei, $schluessel, $ersatz) {
     if (-not (Test-Path $datei)) { return $ersatz }
     try {
@@ -217,20 +217,20 @@ function LiesPort($datei, $schluessel, $ersatz) {
         $wert = $daten.dienste.$schluessel
         if ($wert) { return [int]$wert }
     } catch {
-        Warnung "Konfiguration $datei ist nicht lesbar - es gilt $ersatz."
+        Warnung "Configuration $datei is not readable - $ersatz is used."
     }
     return $ersatz
 }
 
-# -------------------------------------------------------------- Autostart ----
+# --------------------------------------------------------------- autostart ---
 
 function StartVerknuepfung {
     return (Join-Path ([Environment]::GetFolderPath('Startup')) 'CamGrid.lnk')
 }
 
-# Reihenfolge: geplante Aufgabe (bevorzugt), dann schtasks, dann als letzter
-# Ausweg eine Verknuepfung im Autostart-Ordner. So klappt es auch dort, wo
-# geplante Aufgaben gesperrt sind.
+# Order: scheduled task (preferred), then schtasks, and as a last resort a
+# shortcut in the startup folder. That way it also works where scheduled
+# tasks are blocked.
 function RichteAutostartEin($pythonw, $konfigdatei, $port) {
     $argumente = '"{0}\app\dienst.py" --mit-server --config "{1}" --port {2}' -f $Projekt, $konfigdatei, $port
 
@@ -240,21 +240,21 @@ function RichteAutostartEin($pythonw, $konfigdatei, $port) {
         $einstellungen = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
             -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero)
         Register-ScheduledTask -TaskName $Aufgabenname -Action $aktion -Trigger $ausloeser `
-            -Settings $einstellungen -Description 'Startet CamGrid bei der Anmeldung.' `
+            -Settings $einstellungen -Description 'Starts CamGrid at logon.' `
             -Force -ErrorAction Stop | Out-Null
-        Meldung "Autostart eingerichtet: geplante Aufgabe '$Aufgabenname' (bei der Anmeldung)."
+        Meldung "Autostart set up: scheduled task '$Aufgabenname' (at logon)."
         return 'aufgabe'
     } catch {
-        Warnung ("Geplante Aufgabe nicht moeglich: " + $_.Exception.Message)
+        Warnung ("Scheduled task not possible: " + $_.Exception.Message)
     }
 
     $befehlszeile = '"{0}" {1}' -f $pythonw, $argumente
     & schtasks /Create /TN $Aufgabenname /TR $befehlszeile /SC ONLOGON /RL LIMITED /F 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Meldung "Autostart eingerichtet: geplante Aufgabe '$Aufgabenname' (ueber schtasks)."
+        Meldung "Autostart set up: scheduled task '$Aufgabenname' (via schtasks)."
         return 'aufgabe'
     }
-    Warnung 'Auch schtasks war nicht erfolgreich - es wird der Autostart-Ordner verwendet.'
+    Warnung 'schtasks was not successful either - the startup folder is used instead.'
 
     try {
         $verknuepfung = StartVerknuepfung
@@ -263,12 +263,12 @@ function RichteAutostartEin($pythonw, $konfigdatei, $port) {
         $ziel.TargetPath = $pythonw
         $ziel.Arguments = $argumente
         $ziel.WorkingDirectory = $Projekt
-        $ziel.Description = 'Startet CamGrid bei der Anmeldung.'
+        $ziel.Description = 'Starts CamGrid at logon.'
         $ziel.Save()
-        Meldung "Autostart eingerichtet: $verknuepfung"
+        Meldung "Autostart set up: $verknuepfung"
         return 'verknuepfung'
     } catch {
-        Warnung ("Autostart konnte nicht eingerichtet werden: " + $_.Exception.Message)
+        Warnung ("Autostart could not be set up: " + $_.Exception.Message)
         return 'keiner'
     }
 }
@@ -279,20 +279,20 @@ function EntferneAutostart {
         $vorhanden = Get-ScheduledTask -TaskName $Aufgabenname -ErrorAction SilentlyContinue
         if ($vorhanden) {
             Unregister-ScheduledTask -TaskName $Aufgabenname -Confirm:$false -ErrorAction Stop
-            Meldung "Geplante Aufgabe '$Aufgabenname' entfernt."
+            Meldung "Scheduled task '$Aufgabenname' removed."
             $entfernt = $true
         }
     } catch {
-        Warnung ("Geplante Aufgabe liess sich nicht entfernen: " + $_.Exception.Message)
+        Warnung ("The scheduled task could not be removed: " + $_.Exception.Message)
     }
-    # Nur wenn es das Cmdlet nicht gibt, ueber schtasks nachsehen - sonst
-    # meldet schtasks bei jedem Lauf ohne Aufgabe eine Fehlerzeile.
+    # Only look via schtasks when the cmdlet is missing - otherwise schtasks
+    # prints an error line on every run without a task.
     if (-not $entfernt -and -not (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue)) {
         & cmd /c "schtasks /Query /TN ""$Aufgabenname"" >nul 2>&1"
         if ($LASTEXITCODE -eq 0) {
             & cmd /c "schtasks /Delete /TN ""$Aufgabenname"" /F >nul 2>&1"
             if ($LASTEXITCODE -eq 0) {
-                Meldung "Geplante Aufgabe '$Aufgabenname' entfernt (ueber schtasks)."
+                Meldung "Scheduled task '$Aufgabenname' removed (via schtasks)."
                 $entfernt = $true
             }
         }
@@ -300,19 +300,19 @@ function EntferneAutostart {
     $verknuepfung = StartVerknuepfung
     if (Test-Path $verknuepfung) {
         Remove-Item $verknuepfung -Force
-        Meldung "Entfernt: $verknuepfung"
+        Meldung "Removed: $verknuepfung"
         $entfernt = $true
     }
     if (-not $entfernt) {
-        Meldung 'Es war kein Autostart eingerichtet.'
+        Meldung 'There was no autostart set up.'
     }
 }
 
-# ----------------------------------------------------- Umgebungsvariablen ----
+# ------------------------------------------------- environment variables -----
 
-# app/streams.py legt go2rtc.yaml sonst unter C:\var\lib ab - deshalb werden
-# die Pfade als Benutzer-Umgebungsvariablen hinterlegt. Das geht ohne
-# Adminrechte und gilt auch fuer die geplante Aufgabe.
+# Otherwise app/streams.py would put go2rtc.yaml under C:\var\lib - so the
+# paths are stored as user environment variables. That works without admin
+# rights and also applies to the scheduled task.
 function SetzeUmgebung($konfigdatei, $datenverz) {
     $werte = [ordered]@{
         'CAMGRID_CONFIG'      = $konfigdatei
@@ -323,26 +323,26 @@ function SetzeUmgebung($konfigdatei, $datenverz) {
         [Environment]::SetEnvironmentVariable($schluessel, $werte[$schluessel], 'User')
         Set-Item -Path ("env:" + $schluessel) -Value $werte[$schluessel]
     }
-    Meldung 'Umgebungsvariablen gesetzt: CAMGRID_CONFIG, CAMGRID_GO2RTC_YAML, CAMGRID_WEB'
+    Meldung 'Environment variables set: CAMGRID_CONFIG, CAMGRID_GO2RTC_YAML, CAMGRID_WEB'
 }
 
 function EntferneUmgebung {
     foreach ($schluessel in 'CAMGRID_CONFIG','CAMGRID_GO2RTC_YAML','CAMGRID_WEB') {
         [Environment]::SetEnvironmentVariable($schluessel, $null, 'User')
     }
-    Meldung 'Umgebungsvariablen entfernt.'
+    Meldung 'Environment variables removed.'
 }
 
-# ------------------------------------------------------------ Deinstallation -
+# ------------------------------------------------------------------ uninstall -
 
 function Deinstallieren {
     $datenverz = Datenverzeichnis
     $konfigdatei = Join-Path $datenverz 'config.json'
-    Meldung 'CamGrid wird von diesem Rechner entfernt.'
+    Meldung 'CamGrid is being removed from this computer.'
 
     if ($DryRun) {
-        Meldung "[Probelauf] Autostart '$Aufgabenname' wuerde entfernt."
-        Meldung "[Probelauf] Nach $konfigdatei wuerde gefragt."
+        Meldung "[Dry run] The autostart '$Aufgabenname' would be removed."
+        Meldung "[Dry run] You would be asked about $konfigdatei."
         return
     }
 
@@ -352,33 +352,33 @@ function Deinstallieren {
     if (Test-Path $konfigdatei) {
         $antwort = ''
         try {
-            $antwort = Read-Host "Konfiguration $konfigdatei behalten? [J/n]"
+            $antwort = Read-Host "Keep the configuration $konfigdatei? [Y/n]"
         } catch {
-            $antwort = 'j'
+            $antwort = 'y'
         }
-        if ($antwort -match '^(n|nein)$') {
+        if ($antwort -match '^(n|no)$') {
             Remove-Item $datenverz -Recurse -Force
-            Meldung "Entfernt: $datenverz"
+            Meldung "Removed: $datenverz"
         } else {
-            Meldung "Konfiguration bleibt erhalten: $konfigdatei"
+            Meldung "The configuration is kept: $konfigdatei"
         }
     } else {
-        Meldung 'Es war keine Konfiguration vorhanden.'
+        Meldung 'There was no configuration.'
     }
 
     Write-Host ''
-    Meldung 'Fertig. Die Projektdateien selbst wurden nicht angetastet.'
-    Meldung "Sie liegen weiterhin in $Projekt und koennen von Hand geloescht werden."
+    Meldung 'Done. The project files themselves were not touched.'
+    Meldung "They are still in $Projekt and can be deleted by hand."
 }
 
-# ----------------------------------------------------------------- Ablauf -----
+# --------------------------------------------------------------------- flow ---
 
 $version = Projektversion
 Write-Host ''
 Meldung "CamGrid $version - Windows"
 
-if ($Port -lt 1 -or $Port -gt 65535) { Fehler "Ungueltiger Port: $Port" }
-if ($Port -eq $AnzeigePort) { Fehler "Port $AnzeigePort ist fuer die Anzeige belegt - bitte einen anderen waehlen." }
+if ($Port -lt 1 -or $Port -gt 65535) { Fehler "Invalid port: $Port" }
+if ($Port -eq $AnzeigePort) { Fehler "Port $AnzeigePort is used by the display - please pick another one." }
 
 if ($Uninstall) { Deinstallieren; exit 0 }
 
@@ -387,73 +387,73 @@ $datenverz = Datenverzeichnis
 $konfigdatei = Join-Path $datenverz 'config.json'
 
 if ($adminrechte) {
-    Meldung "Adminrechte vorhanden - Konfiguration unter $datenverz"
+    Meldung "Admin rights present - configuration under $datenverz"
 } else {
-    Meldung "Ohne Adminrechte (das genuegt) - Konfiguration unter $datenverz"
+    Meldung "Without admin rights (that is enough) - configuration under $datenverz"
 }
-if ($DryRun) { Meldung '[Probelauf] Es wird nichts geaendert.' }
+if ($DryRun) { Meldung '[Dry run] Nothing is changed.' }
 
-# 1. Projektdateien pruefen
+# 1. Check the project files
 foreach ($pflicht in 'app\dienst.py', 'app\server.py', 'web\public') {
     if (-not (Test-Path (Join-Path $Projekt $pflicht))) {
-        Fehler "$pflicht fehlt in $Projekt - bitte das Skript im Projektordner starten."
+        Fehler "$pflicht is missing in $Projekt - please run the script inside the project folder."
     }
 }
 
-# 2. Python pruefen
+# 2. Check Python
 $py = FindePython
 if (-not $py) {
     PythonHinweis
-    if (-not $DryRun) { Fehler 'Ohne Python 3 geht es nicht weiter.' }
+    if (-not $DryRun) { Fehler 'Without Python 3 this cannot continue.' }
     $py = [pscustomobject]@{ Python = 'python.exe'; Pythonw = 'pythonw.exe' }
 } else {
     Meldung ("Python 3: " + $py.Python)
     if ($py.Pythonw -ne $py.Python) {
-        Meldung ("Ohne Fenster: " + $py.Pythonw)
+        Meldung ("Without a window: " + $py.Pythonw)
     } else {
-        Warnung 'pythonw.exe nicht gefunden - der Autostart oeffnet ein Konsolenfenster.'
+        Warnung 'pythonw.exe not found - the autostart will open a console window.'
     }
 }
 
-# 3. go2rtc pruefen
+# 3. Check go2rtc
 $go2rtc = Join-Path $Projekt 'vendor\go2rtc\go2rtc.exe'
 if (Test-Path $go2rtc) {
-    Meldung "Streaming-Dienst: $go2rtc"
+    Meldung "Streaming service: $go2rtc"
 } else {
-    Warnung "go2rtc fehlt: $go2rtc"
-    Warnung 'Ohne go2rtc gibt es keine Videobilder. Datei go2rtc_win64.zip von'
-    Warnung 'https://github.com/AlexxIT/go2rtc/releases holen, go2rtc.exe nach'
-    Warnung 'vendor\go2rtc\ entpacken und install.ps1 erneut starten.'
+    Warnung "go2rtc is missing: $go2rtc"
+    Warnung 'Without go2rtc there are no video images. Get go2rtc_win64.zip from'
+    Warnung 'https://github.com/AlexxIT/go2rtc/releases, extract go2rtc.exe into'
+    Warnung 'vendor\go2rtc\ and run install.ps1 again.'
 }
 
-# 4. Verzeichnis und Konfiguration
+# 4. Directory and configuration
 if ($DryRun) {
-    Meldung "[Probelauf] Verzeichnis wuerde angelegt: $datenverz"
+    Meldung "[Dry run] The directory would be created: $datenverz"
     if (Test-Path $konfigdatei) {
-        Meldung "[Probelauf] Vorhandene Konfiguration bleibt unveraendert: $konfigdatei"
+        Meldung "[Dry run] The existing configuration would stay unchanged: $konfigdatei"
     } else {
-        Meldung "[Probelauf] Konfiguration wuerde angelegt: $konfigdatei"
-        Meldung "[Probelauf] Startzugang waere: $StandardBenutzer / $StandardPasswort"
+        Meldung "[Dry run] The configuration would be created: $konfigdatei"
+        Meldung "[Dry run] The initial login would be: $StandardBenutzer / $StandardPasswort"
     }
 } else {
     if (-not (Test-Path $datenverz)) {
         New-Item -ItemType Directory -Path $datenverz -Force | Out-Null
-        Meldung "Verzeichnis angelegt: $datenverz"
+        Meldung "Directory created: $datenverz"
     }
 }
 
 $neueKonfiguration = $false
 if (-not $DryRun) {
     if (Test-Path $konfigdatei) {
-        Meldung "Konfiguration ist vorhanden und bleibt unveraendert: $konfigdatei"
+        Meldung "The configuration exists and stays unchanged: $konfigdatei"
         if ($Port -ne 8080) {
-            Warnung "-Port $Port wird nicht uebernommen: der Port steht in der vorhandenen Konfiguration."
+            Warnung "-Port $Port is ignored: the port is taken from the existing configuration."
         }
     } else {
         if (ErzeugeKonfiguration $py.Python $konfigdatei $Port) {
             $neueKonfiguration = $true
         } else {
-            Fehler "Konfiguration $konfigdatei konnte nicht angelegt werden."
+            Fehler "The configuration $konfigdatei could not be created."
         }
     }
     SetzeUmgebung $konfigdatei $datenverz
@@ -462,16 +462,16 @@ if (-not $DryRun) {
 # 5. Autostart
 $autostartart = 'keiner'
 if ($NoAutostart) {
-    Meldung 'Kein Autostart (-NoAutostart).'
+    Meldung 'No autostart (-NoAutostart).'
     if (-not $DryRun) { EntferneAutostart }
 } elseif ($DryRun) {
-    Meldung "[Probelauf] Geplante Aufgabe '$Aufgabenname' wuerde bei der Anmeldung starten:"
-    Meldung ("[Probelauf]   {0} `"{1}\app\dienst.py`" --mit-server --config `"{2}`" --port {3}" -f $py.Pythonw, $Projekt, $konfigdatei, $Port)
+    Meldung "[Dry run] The scheduled task '$Aufgabenname' would start at logon:"
+    Meldung ("[Dry run]   {0} `"{1}\app\dienst.py`" --mit-server --config `"{2}`" --port {3}" -f $py.Pythonw, $Projekt, $konfigdatei, $Port)
 } else {
     $autostartart = RichteAutostartEin $py.Pythonw $konfigdatei $Port
 }
 
-# ----------------------------------------------------------- Zusammenfassung --
+# ------------------------------------------------------------------- summary --
 
 $ip = EigeneIpAdresse
 $adminport = $Port
@@ -484,58 +484,58 @@ if (-not $DryRun) {
 Write-Host ''
 Write-Host '========================================================'
 if ($DryRun) {
-    Write-Host " CamGrid $version - Probelauf beendet (nichts geaendert)"
+    Write-Host " CamGrid $version - dry run finished (nothing changed)"
 } else {
-    Write-Host " CamGrid $version - Installation abgeschlossen"
+    Write-Host " CamGrid $version - installation finished"
 }
 Write-Host '========================================================'
 Write-Host ''
-Write-Host ' Adressen'
-Write-Host "   Verwaltung : http://$ip`:$adminport"
-Write-Host "   Anzeige    : http://$ip`:$anzeige/?monitor=1"
-Write-Host "   Am Geraet  : http://127.0.0.1:$adminport"
+Write-Host ' Addresses'
+Write-Host "   Admin     : http://$ip`:$adminport"
+Write-Host "   Display   : http://$ip`:$anzeige/?monitor=1"
+Write-Host "   On device : http://127.0.0.1:$adminport"
 Write-Host ''
-Write-Host ' Zugangsdaten'
+Write-Host ' Credentials'
 if ($neueKonfiguration -or $DryRun) {
-    Write-Host "   Benutzer   : $StandardBenutzer"
-    Write-Host "   Passwort   : $StandardPasswort"
-    Write-Host '   >>> Das ist die bekannte Vorgabe. Bitte SOFORT nach dem ersten'
-    Write-Host '   >>> Anmelden in der Verwaltung ein eigenes Passwort setzen.'
+    Write-Host "   User      : $StandardBenutzer"
+    Write-Host "   Password  : $StandardPasswort"
+    Write-Host '   >>> This is the well-known default. Please set your own password'
+    Write-Host '   >>> in the admin interface IMMEDIATELY after the first login.'
 } else {
-    Write-Host '   Unveraendert (vorhandene Konfiguration wurde beibehalten).'
-    Write-Host "   Vorgabe bei einer frischen Installation: $StandardBenutzer / $StandardPasswort"
+    Write-Host '   Unchanged (the existing configuration was kept).'
+    Write-Host "   Default for a fresh installation: $StandardBenutzer / $StandardPasswort"
 }
 Write-Host ''
-Write-Host ' Pfade'
-Write-Host "   Projekt        : $Projekt"
-Write-Host "   Konfiguration  : $konfigdatei"
+Write-Host ' Paths'
+Write-Host "   Project        : $Projekt"
+Write-Host "   Configuration  : $konfigdatei"
 Write-Host "   go2rtc.yaml    : $(Join-Path $datenverz 'go2rtc.yaml')"
-Write-Host "   Protokoll      : $(Join-Path $datenverz 'go2rtc.log')"
+Write-Host "   Log            : $(Join-Path $datenverz 'go2rtc.log')"
 Write-Host ''
-Write-Host ' Naechste Schritte'
-Write-Host '   1. Jetzt starten, ohne neu anzumelden:'
+Write-Host ' Next steps'
+Write-Host '   1. Start it now, without logging in again:'
 Write-Host ("      `"{0}`" `"{1}\app\dienst.py`" --mit-server --config `"{2}`" --port {3}" -f $py.Pythonw, $Projekt, $konfigdatei, $adminport)
 if ($autostartart -eq 'aufgabe') {
-    Write-Host "      oder: Start-ScheduledTask -TaskName $Aufgabenname"
+    Write-Host "      or: Start-ScheduledTask -TaskName $Aufgabenname"
 }
-Write-Host '   2. Verwaltung im Browser oeffnen, Passwort aendern, Kameras eintragen.'
-Write-Host '   3. Anzeige im Vollbild oeffnen (F11 im Browser):'
+Write-Host '   2. Open the admin interface in a browser, change the password, add cameras.'
+Write-Host '   3. Open the display full screen (F11 in the browser):'
 Write-Host "      http://127.0.0.1:$anzeige/?monitor=1"
 Write-Host ''
 Write-Host ' Autostart'
 switch ($autostartart) {
-    'aufgabe'     { Write-Host "   Geplante Aufgabe '$Aufgabenname' - laeuft bei jeder Anmeldung." }
-    'verknuepfung' { Write-Host "   Verknuepfung im Autostart-Ordner: $(StartVerknuepfung)" }
+    'aufgabe'     { Write-Host "   Scheduled task '$Aufgabenname' - runs at every logon." }
+    'verknuepfung' { Write-Host "   Shortcut in the startup folder: $(StartVerknuepfung)" }
     default {
         if ($NoAutostart) {
-            Write-Host '   Nicht eingerichtet (-NoAutostart).'
+            Write-Host '   Not set up (-NoAutostart).'
         } elseif ($DryRun) {
-            Write-Host '   Im Probelauf nicht eingerichtet.'
+            Write-Host '   Not set up during a dry run.'
         } else {
-            Write-Host '   Nicht eingerichtet - bitte von Hand starten (siehe oben).'
+            Write-Host '   Not set up - please start it by hand (see above).'
         }
     }
 }
-Write-Host "   Entfernen: powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall"
+Write-Host "   Remove: powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall"
 Write-Host ''
 exit 0

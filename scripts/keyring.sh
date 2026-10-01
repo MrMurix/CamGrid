@@ -1,11 +1,10 @@
 #!/bin/sh
-# CamGrid - Schluesselbund beim Anmelden entsperren.
+# CamGrid - unlock the keyring at login.
 #
-# Auf einem Pi ohne Tastatur bliebe sonst das Passwortfenster des
-# GNOME-Schluesselbunds stehen und verdeckt die Anzeige.
-# Das Passwort steht in /etc/camgrid/keyring.pw (Rechte 600,
-# Eigentuemer ist der Dienstbenutzer). Fehlt die Datei, endet das
-# Skript kommentarlos.
+# On a Pi without a keyboard the password dialog of the GNOME keyring would
+# otherwise stay on screen and cover the display.
+# The password is kept in /etc/camgrid/keyring.pw (mode 600, owned by the
+# service user). If the file is missing, the script exits silently.
 set -u
 
 PWDATEI="/etc/camgrid/keyring.pw"
@@ -18,7 +17,7 @@ command -v gnome-keyring-daemon >/dev/null 2>&1 || exit 0
 passwort=$(head -n 1 "$PWDATEI")
 [ -n "$passwort" ] || exit 0
 
-# --unlock liest das Passwort aus der Standardeingabe.
+# --unlock reads the password from standard input.
 printf '%s\n' "$passwort" \
     | gnome-keyring-daemon --unlock --daemonize --components=secrets >/dev/null 2>&1 || exit 0
 

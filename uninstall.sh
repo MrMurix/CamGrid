@@ -1,9 +1,9 @@
 #!/bin/sh
-# CamGrid - Deinstallationsskript (Linux und macOS)
-# Entfernt Dienste (systemd oder launchd), Autostart, sudoers-Regel und
-# /opt/camgrid. Die Konfiguration unter /etc/camgrid wird auf Wunsch
-# behalten (Standard).
-# Aufruf: sudo ./uninstall.sh [--alles] [--behalten] [--help]
+# CamGrid - uninstall script (Linux and macOS)
+# Removes the services (systemd or launchd), the autostart entries, the
+# sudoers rule and /opt/camgrid. The configuration in /etc/camgrid is kept
+# on request (default).
+# Usage: sudo ./uninstall.sh [--alles] [--behalten] [--help]
 set -eu
 
 ZIELVERZ="/opt/camgrid"
@@ -20,27 +20,27 @@ meldung() {
 }
 
 warnung() {
-    printf '[camgrid] Warnung: %s\n' "$1" >&2
+    printf '[camgrid] Warning: %s\n' "$1" >&2
 }
 
 fehler() {
-    printf '[camgrid] Fehler: %s\n' "$1" >&2
+    printf '[camgrid] Error: %s\n' "$1" >&2
     exit 1
 }
 
 hilfe() {
     printf '%s\n' \
-"CamGrid - Deinstallation" \
+"CamGrid - uninstall" \
 "" \
-"Aufruf:" \
-"  sudo ./uninstall.sh [Optionen]" \
+"Usage:" \
+"  sudo ./uninstall.sh [options]" \
 "" \
-"Optionen:" \
-"  --behalten   Konfiguration in /etc/camgrid behalten (keine Rueckfrage)" \
-"  --alles      Konfiguration ebenfalls loeschen (keine Rueckfrage)" \
-"  --help       Diese Hilfe anzeigen" \
+"Options:" \
+"  --behalten   Keep the configuration in /etc/camgrid (no question asked)" \
+"  --alles      Delete the configuration as well (no question asked)" \
+"  --help       Show this help" \
 "" \
-"Ohne Option wird nachgefragt. Standard der Rueckfrage: behalten."
+"Without an option you are asked. The default answer is to keep it."
 }
 
 while [ $# -gt 0 ]; do
@@ -48,26 +48,26 @@ while [ $# -gt 0 ]; do
         --alles)    KONFIG_ENTFERNEN="ja"; shift ;;
         --behalten) KONFIG_ENTFERNEN="nein"; shift ;;
         --help|-h)  hilfe; exit 0 ;;
-        *)          fehler "Unbekannte Option: $1 (siehe --help)" ;;
+        *)          fehler "Unknown option: $1 (see --help)" ;;
     esac
 done
 
-[ "$(id -u)" = "0" ] || fehler "Bitte mit Root-Rechten starten: sudo ./uninstall.sh"
+[ "$(id -u)" = "0" ] || fehler "Please run with root rights, for example: sudo ./uninstall.sh"
 
-# ------------------------------------------------------------------ Dienste --
+# ------------------------------------------------------------------ services -
 
 beende_dienste() {
     if ! command -v systemctl >/dev/null 2>&1; then
-        meldung "Kein systemd vorhanden - systemd-Dienste werden uebergangen."
+        meldung "No systemd present - systemd services are skipped."
         return 0
     fi
-    meldung "systemd-Dienste werden beendet und abgeschaltet ..."
+    meldung "Stopping and disabling the systemd services ..."
     for einheit in camgrid-admin.service camgrid-go2rtc.service; do
         systemctl stop "$einheit" >/dev/null 2>&1 || true
         systemctl disable "$einheit" >/dev/null 2>&1 || true
         if [ -f "$SYSTEMDVERZ/$einheit" ]; then
             rm -f "$SYSTEMDVERZ/$einheit"
-            meldung "Entfernt: $SYSTEMDVERZ/$einheit"
+            meldung "Removed: $SYSTEMDVERZ/$einheit"
         fi
     done
     systemctl daemon-reload || true
@@ -76,13 +76,13 @@ beende_dienste() {
 
 # ------------------------------------------------------------------ launchd --
 
-# Auf macOS liegen die Dienste als Benutzer-Agenten in
-# ~/Library/LaunchAgents/de.camgrid.*.plist - und zwar in jedem
-# Heimatverzeichnis, damit auch ein gewechselter Dienstbenutzer erfasst wird.
+# On macOS the services are user agents in
+# ~/Library/LaunchAgents/de.camgrid.*.plist - in every home directory, so that
+# a changed service user is covered as well.
 beende_launchd_dienste() {
     [ "$(uname -s 2>/dev/null || true)" = "Darwin" ] || return 0
     command -v launchctl >/dev/null 2>&1 || return 0
-    meldung "launchd-Dienste werden entladen ..."
+    meldung "Unloading the launchd services ..."
 
     for heim in /Users/*; do
         [ -d "$heim/Library/LaunchAgents" ] || continue
@@ -97,26 +97,26 @@ beende_launchd_dienste() {
                 sudo -u "$besitzer" launchctl unload "$plist" >/dev/null 2>&1 || true
             fi
             rm -f "$plist"
-            meldung "Entfernt: $plist"
+            meldung "Removed: $plist"
         done
     done
 }
 
-# ------------------------------------------------------------ Kiosk-Fenster --
+# ------------------------------------------------------------ kiosk windows --
 
 beende_fenster() {
-    meldung "Laufende Anzeigefenster werden beendet ..."
-    # Muster in Klammern, damit pkill nicht die eigene Befehlszeile trifft
+    meldung "Stopping running display windows ..."
+    # The pattern is bracketed so that pkill does not match its own command line
     pkill -f '[k]amerawand-fenster' >/dev/null 2>&1 || true
     pkill -f '[k]iosk.sh' >/dev/null 2>&1 || true
 }
 
-# ---------------------------------------------------------------- Autostart --
+# ---------------------------------------------------------------- autostart --
 
 entferne_autostart() {
-    meldung "Autostart-Eintraege werden entfernt ..."
-    # Alle Heimatverzeichnisse durchsuchen, damit auch ein geaenderter
-    # Dienstbenutzer erfasst wird.
+    meldung "Removing the autostart entries ..."
+    # Search all home directories, so that a changed service user is covered
+    # as well.
     heimliste() {
         if command -v getent >/dev/null 2>&1; then
             getent passwd | awk -F: '$3>=1000 && $3<65534 {print $6}'
@@ -129,7 +129,7 @@ entferne_autostart() {
         for datei in camgrid-kiosk.desktop camgrid-keyring.desktop; do
             if [ -f "$heim/.config/autostart/$datei" ]; then
                 rm -f "$heim/.config/autostart/$datei"
-                printf '[camgrid] Entfernt: %s\n' "$heim/.config/autostart/$datei"
+                printf '[camgrid] Removed: %s\n' "$heim/.config/autostart/$datei"
             fi
         done
     done
@@ -140,27 +140,27 @@ entferne_autostart() {
 entferne_sudoers() {
     if [ -f "$SUDOERSDATEI" ]; then
         rm -f "$SUDOERSDATEI"
-        meldung "Entfernt: $SUDOERSDATEI"
+        meldung "Removed: $SUDOERSDATEI"
         if ! visudo -c >/dev/null 2>&1; then
-            warnung "'visudo -c' meldet einen Fehler. Bitte /etc/sudoers pruefen."
+            warnung "'visudo -c' reports an error. Please check /etc/sudoers."
         fi
     fi
 }
 
-# ------------------------------------------------------------------- Dateien -
+# -------------------------------------------------------------------- files --
 
 entferne_programmdateien() {
     if [ -d "$ZIELVERZ" ]; then
         rm -rf "$ZIELVERZ"
-        meldung "Entfernt: $ZIELVERZ"
+        meldung "Removed: $ZIELVERZ"
     fi
     if [ -d "$DATAVERZ" ]; then
         rm -rf "$DATAVERZ"
-        meldung "Entfernt: $DATAVERZ"
+        meldung "Removed: $DATAVERZ"
     fi
     if [ -d "$LOGVERZ" ]; then
         rm -rf "$LOGVERZ"
-        meldung "Entfernt: $LOGVERZ"
+        meldung "Removed: $LOGVERZ"
     fi
 }
 
@@ -173,29 +173,29 @@ frage_konfiguration() {
         return 0
     fi
     if [ ! -t 0 ]; then
-        meldung "Keine Eingabe moeglich - Konfiguration wird behalten."
+        meldung "No input possible - the configuration is kept."
         KONFIG_ENTFERNEN="nein"
         return 0
     fi
 
-    printf 'Konfiguration in %s behalten? [J/n] ' "$CONFVERZ"
+    printf 'Keep the configuration in %s? [Y/n] ' "$CONFVERZ"
     read -r antwort || antwort=""
     case "$antwort" in
-        n|N|nein|Nein|NEIN) KONFIG_ENTFERNEN="ja" ;;
-        *)                  KONFIG_ENTFERNEN="nein" ;;
+        n|N|no|No|NO|nein|Nein|NEIN) KONFIG_ENTFERNEN="ja" ;;
+        *)                           KONFIG_ENTFERNEN="nein" ;;
     esac
 }
 
 entferne_konfiguration() {
     if [ "$KONFIG_ENTFERNEN" = "ja" ]; then
         rm -rf "$CONFVERZ"
-        meldung "Entfernt: $CONFVERZ"
+        meldung "Removed: $CONFVERZ"
     else
-        meldung "Konfiguration bleibt erhalten: $CONFVERZ"
+        meldung "The configuration is kept: $CONFVERZ"
     fi
 }
 
-# ------------------------------------------------------------------- Ablauf --
+# --------------------------------------------------------------------- flow --
 
 frage_konfiguration
 beende_fenster
@@ -207,7 +207,7 @@ entferne_programmdateien
 entferne_konfiguration
 
 printf '\n'
-meldung "Deinstallation abgeschlossen."
+meldung "Uninstall finished."
 if [ "$KONFIG_ENTFERNEN" != "ja" ]; then
-    meldung "Zum vollstaendigen Entfernen: sudo rm -rf $CONFVERZ"
+    meldung "To remove everything: sudo rm -rf $CONFVERZ"
 fi

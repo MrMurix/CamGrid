@@ -1,7 +1,7 @@
-# CamGrid - Admin-Server (Verwaltungsoberflaeche und JSON-Schnittstelle)
-# __DIENSTBENUTZER__, __DIENSTGRUPPE__ und __PYTHON__ werden von install.sh ersetzt.
+# CamGrid - admin server (management interface and JSON API)
+# __DIENSTBENUTZER__, __DIENSTGRUPPE__ and __PYTHON__ are replaced by install.sh.
 [Unit]
-Description=CamGrid Admin-Server
+Description=CamGrid admin server
 Documentation=file:///opt/camgrid
 After=network-online.target
 Wants=network-online.target

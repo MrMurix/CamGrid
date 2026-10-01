@@ -1,11 +1,11 @@
 #!/bin/sh
-# CamGrid - Installationsskript fuer Linux (Debian/Raspberry Pi OS/Ubuntu,
-# Fedora, Arch, openSUSE) und macOS.
+# CamGrid - installation script for Linux (Debian/Raspberry Pi OS/Ubuntu,
+# Fedora, Arch, openSUSE) and macOS.
 #
-# Richtet Admin-Server, Streaming-Dienst (go2rtc) und - falls eine grafische
-# Oberflaeche vorhanden ist - die Kiosk-Anzeige ein.
+# Sets up the admin server, the streaming service (go2rtc) and - if a
+# graphical desktop is present - the kiosk display.
 #
-# Aufruf: sudo ./install.sh [--user NAME] [--no-kiosk] [--port N] [--help]
+# Usage: sudo ./install.sh [--user NAME] [--no-kiosk] [--port N] [--help]
 set -eu
 
 ZIELVERZ="/opt/camgrid"
@@ -22,50 +22,50 @@ ANZEIGEPORT="1984"
 DIENSTBENUTZER=""
 KIOSK="ja"
 
-# Feste Startzugangsdaten. Sie sind absichtlich bekannt und muessen beim
-# ersten Anmelden geaendert werden - siehe Hinweis in der Zusammenfassung.
+# Fixed initial credentials. They are deliberately well known and must be
+# changed at the first login - see the note in the summary.
 STANDARDBENUTZER="admin"
 STANDARDPASSWORT="camgrid"
 
 SKRIPTVERZ=$(cd "$(dirname "$0")" && pwd)
-QUELLVERZ="$SKRIPTVERZ"        # hier liegen vendor/ und web/
-TROCKEN="nein"                 # --dry-run: nur zeigen, nichts aendern
+QUELLVERZ="$SKRIPTVERZ"        # this is where vendor/ and web/ live
+TROCKEN="nein"                 # --dry-run: only show, change nothing
 
-SYSTEM="unbekannt"             # linux oder macos
+SYSTEM="unbekannt"             # linux or macos
 PAKETVERWALTER="keiner"        # apt, dnf, pacman, zypper, brew, keiner
 HAT_SYSTEMD="nein"
 HAT_LAUNCHD="nein"
 HAT_GRAFIK="unbekannt"
-DIENSTART="keiner"             # systemd, launchd oder keiner
+DIENSTART="keiner"             # systemd, launchd or keiner
 CHROMIUM=""
 GO2RTC_BEREIT="nein"
 FEHLENDE_PAKETE=""
-PROJEKTVERSION="unbekannt"
-SCHRITT="Start"
+PROJEKTVERSION="unknown"
+SCHRITT="start"
 
-# ---------------------------------------------------------------- Ausgaben ---
+# ------------------------------------------------------------------ output ---
 
 meldung() {
     printf '[camgrid] %s\n' "$1"
 }
 
 warnung() {
-    printf '[camgrid] Warnung: %s\n' "$1" >&2
+    printf '[camgrid] Warning: %s\n' "$1" >&2
 }
 
 fehler() {
-    printf '[camgrid] Fehler: %s\n' "$1" >&2
+    printf '[camgrid] Error: %s\n' "$1" >&2
     exit 1
 }
 
-# Wird bei jedem unerwarteten Abbruch aufgerufen (set -e oder Strg+C), damit
-# der Nutzer weiss, wo es stehen geblieben ist und wie er weitermacht.
+# Called on every unexpected abort (set -e or Ctrl+C), so that the user knows
+# where it stopped and how to carry on.
 abbruchhinweis() {
     code="$?"
     if [ "$code" != "0" ]; then
-        printf '\n[camgrid] Abgebrochen im Schritt: %s\n' "$SCHRITT" >&2
-        printf '[camgrid] Das Skript ist mehrfach ausfuehrbar - einfach erneut starten.\n' >&2
-        printf '[camgrid] Alles wieder entfernen: sudo %s/uninstall.sh\n' "$SKRIPTVERZ" >&2
+        printf '\n[camgrid] Aborted in step: %s\n' "$SCHRITT" >&2
+        printf '[camgrid] The script can be run repeatedly - just start it again.\n' >&2
+        printf '[camgrid] Remove everything again: sudo %s/uninstall.sh\n' "$SKRIPTVERZ" >&2
     fi
 }
 
@@ -77,57 +77,57 @@ lies_projektversion() {
     for kandidat in "$SKRIPTVERZ/VERSION" "$ZIELVERZ/VERSION"; do
         if [ -r "$kandidat" ]; then
             PROJEKTVERSION=$(head -n 1 "$kandidat" | tr -d ' \t\r\n')
-            [ -n "$PROJEKTVERSION" ] || PROJEKTVERSION="unbekannt"
+            [ -n "$PROJEKTVERSION" ] || PROJEKTVERSION="unknown"
             return 0
         fi
     done
-    PROJEKTVERSION="unbekannt"
+    PROJEKTVERSION="unknown"
 }
 
 hilfe() {
     printf '%s\n' \
-"CamGrid - Installation (Version $PROJEKTVERSION)" \
+"CamGrid - installation (version $PROJEKTVERSION)" \
 "" \
-"Aufruf:" \
-"  sudo ./install.sh [Optionen]              (Linux, Raspberry Pi OS, macOS)" \
+"Usage:" \
+"  sudo ./install.sh [options]                (Linux, Raspberry Pi OS, macOS)" \
 "" \
-"Optionen:" \
-"  --user NAME        Dienstbenutzer (Standard: Benutzer der grafischen Sitzung)" \
-"  --no-kiosk         Nur Dienste einrichten, keinen Chromium-Autostart anlegen" \
-"  --port N           Port des Admin-Servers (Standard: 8080)" \
-"  --dry-run          Nur anzeigen, was getan wuerde - aendert nichts" \
-"  --deinstallieren   Hinweis zum Entfernen anzeigen (siehe uninstall.sh)" \
-"  --version          Projektversion anzeigen" \
-"  --help             Diese Hilfe anzeigen" \
+"Options:" \
+"  --user NAME        Service user (default: user of the graphical session)" \
+"  --no-kiosk         Only set up the services, no Chromium autostart" \
+"  --port N           Port of the admin server (default: 8080)" \
+"  --dry-run          Only show what would be done - changes nothing" \
+"  --deinstallieren   Show how to remove it (see uninstall.sh)" \
+"  --version          Show the project version" \
+"  --help             Show this help" \
 "" \
-"Das Skript ist mehrfach ausfuehrbar. Eine vorhandene Konfiguration unter" \
-"$CONFVERZ/config.json wird niemals ueberschrieben." \
+"The script can be run repeatedly. An existing configuration in" \
+"$CONFVERZ/config.json is never overwritten." \
 "" \
-"Ohne grafische Oberflaeche (Server) entfaellt die Kiosk-Anzeige, die Dienste" \
-"werden trotzdem eingerichtet. Auf macOS werden launchd-Dienste statt systemd" \
-"verwendet und es gibt keinen Kiosk-Autostart."
+"Without a graphical desktop (server) the kiosk display is left out, the" \
+"services are set up anyway. On macOS launchd services are used instead of" \
+"systemd and there is no kiosk autostart."
 }
 
 deinstallationshinweis() {
     printf '%s\n' \
-"CamGrid - Deinstallation" \
+"CamGrid - uninstall" \
 "" \
-"Diese Aufgabe uebernimmt uninstall.sh:" \
-"  sudo $SKRIPTVERZ/uninstall.sh              (Konfiguration wird erfragt)" \
-"  sudo $SKRIPTVERZ/uninstall.sh --behalten   (Konfiguration behalten)" \
-"  sudo $SKRIPTVERZ/uninstall.sh --alles      (auch $CONFVERZ loeschen)" \
+"uninstall.sh takes care of this:" \
+"  sudo $SKRIPTVERZ/uninstall.sh              (you are asked about the configuration)" \
+"  sudo $SKRIPTVERZ/uninstall.sh --behalten   (keep the configuration)" \
+"  sudo $SKRIPTVERZ/uninstall.sh --alles      (delete $CONFVERZ as well)" \
 "" \
-"Auf Windows: powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall"
+"On Windows: powershell -ExecutionPolicy Bypass -File install.ps1 -Uninstall"
 }
 
-# --------------------------------------------------------------- Parameter ---
+# -------------------------------------------------------------- parameters ---
 
 lies_projektversion
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --user)
-            [ $# -ge 2 ] || fehler "--user benoetigt einen Benutzernamen."
+            [ $# -ge 2 ] || fehler "--user needs a user name."
             DIENSTBENUTZER="$2"
             shift 2
             ;;
@@ -144,7 +144,7 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         --port)
-            [ $# -ge 2 ] || fehler "--port benoetigt eine Portnummer."
+            [ $# -ge 2 ] || fehler "--port needs a port number."
             ADMINPORT="$2"
             shift 2
             ;;
@@ -165,78 +165,78 @@ while [ $# -gt 0 ]; do
             exit 0
             ;;
         *)
-            fehler "Unbekannte Option: $1 (siehe --help)"
+            fehler "Unknown option: $1 (see --help)"
             ;;
     esac
 done
 
 case "$ADMINPORT" in
-    ''|*[!0-9]*) fehler "Ungueltiger Admin-Port: $ADMINPORT" ;;
+    ''|*[!0-9]*) fehler "Invalid admin port: $ADMINPORT" ;;
 esac
 if [ "$ADMINPORT" -lt 1 ] || [ "$ADMINPORT" -gt 65535 ]; then
-    fehler "Admin-Port ausserhalb des gueltigen Bereichs: $ADMINPORT"
+    fehler "Admin port out of range: $ADMINPORT"
 fi
 if [ "$ADMINPORT" = "$ANZEIGEPORT" ]; then
-    fehler "Der Admin-Port darf nicht $ANZEIGEPORT sein - den benutzt die Anzeige."
+    fehler "The admin port must not be $ANZEIGEPORT - that one is used by the display."
 fi
 
 trap abbruchhinweis EXIT
 
-# ------------------------------------------------------------ Vorbedingungen -
+# ----------------------------------------------------------- prerequisites ---
 
 erkenne_system() {
-    schritt "Betriebssystem erkennen"
-    kern=$(uname -s 2>/dev/null || printf 'unbekannt')
+    schritt "detect operating system"
+    kern=$(uname -s 2>/dev/null || printf 'unknown')
     case "$kern" in
         Linux)  SYSTEM="linux" ;;
         Darwin) SYSTEM="macos" ;;
         *)
             if [ "$TROCKEN" = "ja" ]; then
-                # Damit sich der Probelauf auch unter Git Bash oder WSL ansehen
-                # laesst, wird dort Linux angenommen.
+                # So that the dry run can also be inspected under Git Bash or
+                # WSL, Linux is assumed there.
                 SYSTEM="linux"
-                meldung "[Probelauf] Unbekannter Systemkern '$kern' - es wird Linux angenommen."
+                meldung "[Dry run] Unknown system kernel '$kern' - Linux is assumed."
             else
-                fehler "Nicht unterstuetztes Betriebssystem: $kern. Fuer Windows bitte install.ps1 verwenden."
+                fehler "Unsupported operating system: $kern. For Windows please use install.ps1."
             fi
             ;;
     esac
 
     beschreibung="$kern"
     if [ "$SYSTEM" = "linux" ] && [ -r /etc/os-release ]; then
-        # In einer Subshell einlesen, damit ID und VERSION die eigenen
-        # Variablen des Skripts nicht ueberschreiben.
+        # Read it in a subshell, so that ID and VERSION do not overwrite the
+        # script's own variables.
         beschreibung=$(. /etc/os-release 2>/dev/null; printf '%s' "${PRETTY_NAME:-${NAME:-Linux}}")
     elif [ "$SYSTEM" = "macos" ]; then
-        beschreibung="macOS $(sw_vers -productVersion 2>/dev/null || printf 'unbekannt')"
+        beschreibung="macOS $(sw_vers -productVersion 2>/dev/null || printf 'unknown')"
     fi
-    meldung "Betriebssystem: $beschreibung"
+    meldung "Operating system: $beschreibung"
 
     if [ "$SYSTEM" = "macos" ] && [ "$KIOSK" = "ja" ]; then
         KIOSK="nein"
-        meldung "macOS: kein Kiosk-Autostart (Hinweis zum Vollbild steht am Ende)."
+        meldung "macOS: no kiosk autostart (the note about full screen is at the end)."
     fi
 }
 
 pruefe_root() {
-    schritt "Rechte pruefen"
+    schritt "check rights"
     if [ "$TROCKEN" = "ja" ]; then
-        meldung "[Probelauf] Rechte werden nicht geprueft."
+        meldung "[Dry run] The rights are not checked."
         return 0
     fi
-    [ "$(id -u)" = "0" ] || fehler "Bitte mit Root-Rechten starten: sudo ./install.sh"
+    [ "$(id -u)" = "0" ] || fehler "Please run with root rights, for example: sudo ./install.sh"
 }
 
 erkenne_dienstverwaltung() {
-    schritt "Dienstverwaltung erkennen"
+    schritt "detect service manager"
     if [ "$SYSTEM" = "macos" ]; then
         if command -v launchctl >/dev/null 2>&1; then
             HAT_LAUNCHD="ja"
             DIENSTART="launchd"
-            meldung "Dienstverwaltung: launchd"
+            meldung "Service manager: launchd"
         else
             DIENSTART="keiner"
-            warnung "launchctl fehlt - die Dienste werden nur eingerichtet, nicht gestartet."
+            warnung "launchctl is missing - the services are only set up, not started."
         fi
         return 0
     fi
@@ -244,20 +244,20 @@ erkenne_dienstverwaltung() {
     if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
         HAT_SYSTEMD="ja"
         DIENSTART="systemd"
-        meldung "Dienstverwaltung: systemd"
+        meldung "Service manager: systemd"
     elif command -v systemctl >/dev/null 2>&1; then
-        warnung "systemd ist installiert, laeuft aber nicht (/run/systemd/system fehlt)."
+        warnung "systemd is installed but not running (/run/systemd/system is missing)."
     else
-        warnung "Kein systemd gefunden - es werden keine Autostart-Dienste eingerichtet."
+        warnung "No systemd found - no autostart services are set up."
     fi
 
     if [ "$DIENSTART" = "keiner" ]; then
-        warnung "Start dann von Hand: python3 $ZIELVERZ/app/dienst.py --mit-server --config $CONFVERZ/config.json"
+        warnung "Start it by hand then: python3 $ZIELVERZ/app/dienst.py --mit-server --config $CONFVERZ/config.json"
     fi
 }
 
 erkenne_paketverwalter() {
-    schritt "Paketverwaltung erkennen"
+    schritt "detect package manager"
     for kandidat in apt-get dnf pacman zypper brew; do
         if command -v "$kandidat" >/dev/null 2>&1; then
             case "$kandidat" in
@@ -272,23 +272,23 @@ erkenne_paketverwalter() {
     fi
     case "$PAKETVERWALTER" in
         keiner)
-            warnung "Keine bekannte Paketverwaltung gefunden (apt, dnf, pacman, zypper, brew)."
-            warnung "Fehlende Programme werden nur genannt, nicht selbst installiert."
+            warnung "No known package manager found (apt, dnf, pacman, zypper, brew)."
+            warnung "Missing programs are only named, not installed automatically."
             ;;
         *)
-            meldung "Paketverwaltung: $PAKETVERWALTER"
+            meldung "Package manager: $PAKETVERWALTER"
             ;;
     esac
 }
 
 ermittle_architektur() {
-    schritt "Architektur erkennen"
+    schritt "detect architecture"
     maschine=$(uname -m)
     if [ "$SYSTEM" = "macos" ]; then
         case "$maschine" in
             arm64|aarch64) GO2RTC_DATEI="go2rtc_mac_arm64" ;;
             x86_64|amd64)  GO2RTC_DATEI="go2rtc_mac_amd64" ;;
-            *) fehler "Nicht unterstuetzte Architektur auf macOS: $maschine" ;;
+            *) fehler "Unsupported architecture on macOS: $maschine" ;;
         esac
     else
         case "$maschine" in
@@ -297,17 +297,17 @@ ermittle_architektur() {
             armv6l)             GO2RTC_DATEI="go2rtc_linux_armv6" ;;
             x86_64|amd64)       GO2RTC_DATEI="go2rtc_linux_amd64" ;;
             *)
-                fehler "Nicht unterstuetzte Architektur: $maschine (erwartet arm64, armv7, armv6 oder amd64)."
+                fehler "Unsupported architecture: $maschine (expected arm64, armv7, armv6 or amd64)."
                 ;;
         esac
     fi
-    meldung "Architektur: $maschine -> $GO2RTC_DATEI"
+    meldung "Architecture: $maschine -> $GO2RTC_DATEI"
 }
 
-# Auf einem Server ohne Bildschirm darf der Kiosk-Teil einfach entfallen -
-# das ist kein Fehler.
+# On a server without a screen the kiosk part may simply be left out - that is
+# not an error.
 erkenne_grafik() {
-    schritt "Grafische Oberflaeche pruefen"
+    schritt "check graphical desktop"
     if [ "$SYSTEM" = "macos" ]; then
         HAT_GRAFIK="ja"
         return 0
@@ -325,19 +325,19 @@ erkenne_grafik() {
     fi
 
     if [ "$HAT_GRAFIK" = "ja" ]; then
-        meldung "Grafische Oberflaeche: vorhanden."
+        meldung "Graphical desktop: present."
     else
-        meldung "Grafische Oberflaeche: keine gefunden - Server-Betrieb."
+        meldung "Graphical desktop: none found - server mode."
         if [ "$KIOSK" = "ja" ]; then
             KIOSK="nein"
-            meldung "Die Kiosk-Anzeige entfaellt daher. Die Anzeigeseite bleibt im Netz erreichbar."
+            meldung "The kiosk display is therefore left out. The display page stays reachable over the network."
         fi
     fi
 }
 
-# ------------------------------------------------------------ Dienstbenutzer -
+# ------------------------------------------------------------- service user --
 
-# Heimatverzeichnis eines Benutzers; getent gibt es auf macOS nicht.
+# Home directory of a user; getent does not exist on macOS.
 heimatverzeichnis() {
     benutzer="$1"
     heim=""
@@ -355,19 +355,19 @@ heimatverzeichnis() {
 }
 
 ermittle_dienstbenutzer() {
-    schritt "Dienstbenutzer ermitteln"
+    schritt "determine service user"
     if [ "$TROCKEN" = "ja" ]; then
         if [ -z "$DIENSTBENUTZER" ]; then DIENSTBENUTZER="$(id -un 2>/dev/null || echo pi)"; fi
         BENUTZERHEIM="${HOME:-/home/$DIENSTBENUTZER}"
         BENUTZERGRUPPE="$DIENSTBENUTZER"
-        meldung "[Probelauf] Dienstbenutzer waere: $DIENSTBENUTZER"
+        meldung "[Dry run] The service user would be: $DIENSTBENUTZER"
         return 0
     fi
     if [ -n "$DIENSTBENUTZER" ]; then
         return 0
     fi
 
-    # 1. Besitzer einer grafischen Sitzung
+    # 1. Owner of a graphical session
     if command -v loginctl >/dev/null 2>&1; then
         kandidat=$(loginctl list-sessions --no-legend 2>/dev/null \
             | awk '{print $3}' | grep -v '^root$' | head -n 1 || true)
@@ -383,7 +383,7 @@ ermittle_dienstbenutzer() {
         return 0
     fi
 
-    # 2. Aufrufender Benutzer
+    # 2. Calling user
     if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
         DIENSTBENUTZER="$SUDO_USER"
         return 0
@@ -401,7 +401,7 @@ ermittle_dienstbenutzer() {
         return 0
     fi
 
-    # 3. Erster regulaerer Benutzer des Systems
+    # 3. First regular user of the system
     if [ "$SYSTEM" = "macos" ]; then
         kandidat=$(dscl . -list /Users UniqueID 2>/dev/null \
             | awk '$2>=500 && $2<60000 {print $1; exit}' || true)
@@ -413,42 +413,42 @@ ermittle_dienstbenutzer() {
         return 0
     fi
 
-    # 4. Notfall auf einem reinen Server: eigenen Systembenutzer anlegen.
+    # 4. Last resort on a pure server: create a dedicated system user.
     if [ "$SYSTEM" = "linux" ] && command -v useradd >/dev/null 2>&1; then
-        meldung "Kein regulaerer Benutzer gefunden - Systembenutzer 'camgrid' wird angelegt."
+        meldung "No regular user found - the system user 'camgrid' is created."
         useradd --system --create-home --home-dir /var/lib/camgrid-heim \
                 --shell /bin/sh camgrid >/dev/null 2>&1 \
             || useradd -r -m -d /var/lib/camgrid-heim camgrid >/dev/null 2>&1 \
-            || fehler "Benutzer 'camgrid' konnte nicht angelegt werden. Bitte --user NAME angeben."
+            || fehler "The user 'camgrid' could not be created. Please pass --user NAME."
         DIENSTBENUTZER="camgrid"
         return 0
     fi
 
-    fehler "Dienstbenutzer nicht ermittelbar. Bitte mit --user NAME angeben."
+    fehler "The service user cannot be determined. Please pass --user NAME."
 }
 
 pruefe_dienstbenutzer() {
-    schritt "Dienstbenutzer pruefen"
+    schritt "check service user"
     if [ "$TROCKEN" = "ja" ]; then
-        meldung "[Probelauf] Dienstbenutzer wird nicht geprueft."
+        meldung "[Dry run] The service user is not checked."
         return 0
     fi
     id "$DIENSTBENUTZER" >/dev/null 2>&1 \
-        || fehler "Benutzer '$DIENSTBENUTZER' existiert nicht."
+        || fehler "The user '$DIENSTBENUTZER' does not exist."
     [ "$DIENSTBENUTZER" != "root" ] \
-        || fehler "root ist als Dienstbenutzer nicht zulaessig. Bitte --user NAME angeben."
+        || fehler "root is not allowed as the service user. Please pass --user NAME."
     BENUTZERGRUPPE=$(id -gn "$DIENSTBENUTZER")
     BENUTZERHEIM=$(heimatverzeichnis "$DIENSTBENUTZER")
     if [ -z "$BENUTZERHEIM" ] || [ ! -d "$BENUTZERHEIM" ]; then
-        fehler "Heimatverzeichnis von '$DIENSTBENUTZER' nicht gefunden."
+        fehler "The home directory of '$DIENSTBENUTZER' was not found."
     fi
-    meldung "Dienstbenutzer: $DIENSTBENUTZER (Gruppe $BENUTZERGRUPPE, Heim $BENUTZERHEIM)"
+    meldung "Service user: $DIENSTBENUTZER (group $BENUTZERGRUPPE, home $BENUTZERHEIM)"
 }
 
-# ------------------------------------------------------------------- Pakete --
+# ---------------------------------------------------------------- packages ---
 
-# Paketname zu einem Befehl - je Paketverwaltung unterschiedlich.
-# Leere Ausgabe bedeutet: dafuer ist kein Paket bekannt.
+# Package name for a command - different per package manager.
+# Empty output means: no package is known for it.
 paketname() {
     befehl="$1"
     case "$PAKETVERWALTER" in
@@ -519,7 +519,7 @@ paketname() {
     esac
 }
 
-# Kann diese Paketverwaltung ohne Rueckfrage installieren?
+# Can this package manager install without asking?
 kann_installieren() {
     case "$PAKETVERWALTER" in
         apt|dnf|pacman) return 0 ;;
@@ -534,7 +534,7 @@ installationsbefehl() {
         pacman) printf 'sudo pacman -S --needed' ;;
         zypper) printf 'sudo zypper install -y' ;;
         brew)   printf 'brew install' ;;
-        *)      printf 'mit der Paketverwaltung des Systems installieren:' ;;
+        *)      printf 'install with the package manager of the system:' ;;
     esac
 }
 
@@ -545,19 +545,19 @@ listen_aktualisieren() {
     LISTEN_AKTUELL="ja"
     case "$PAKETVERWALTER" in
         apt)
-            meldung "Paketlisten werden aktualisiert ..."
+            meldung "Updating the package lists ..."
             DEBIAN_FRONTEND=noninteractive apt-get update -qq \
-                || warnung "apt-get update war nicht erfolgreich - Installation wird dennoch versucht."
+                || warnung "apt-get update was not successful - the installation is attempted anyway."
             ;;
         pacman)
-            meldung "Paketlisten werden aktualisiert ..."
+            meldung "Updating the package lists ..."
             pacman -Sy --noconfirm >/dev/null 2>&1 \
-                || warnung "pacman -Sy war nicht erfolgreich - Installation wird dennoch versucht."
+                || warnung "pacman -Sy was not successful - the installation is attempted anyway."
             ;;
     esac
 }
 
-# Installiert das Paket zu einem Befehl. Rueckgabe 0 = Befehl ist nun da.
+# Installs the package for a command. Return value 0 = the command is there now.
 paket_installieren() {
     befehl="$1"
     paket=$(paketname "$befehl")
@@ -569,7 +569,7 @@ paket_installieren() {
         return 1
     fi
     listen_aktualisieren
-    meldung "Paket wird installiert: $paket"
+    meldung "Installing package: $paket"
     case "$PAKETVERWALTER" in
         apt)
             DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$paket" \
@@ -612,45 +612,47 @@ finde_chromium() {
 }
 
 installiere_pakete() {
-    schritt "Pakete pruefen"
+    schritt "check packages"
     if [ "$TROCKEN" = "ja" ]; then
         if kann_installieren; then
-            meldung "[Probelauf] Fehlende Pakete wuerden mit $PAKETVERWALTER installiert."
+            meldung "[Dry run] Missing packages would be installed with $PAKETVERWALTER."
+        elif [ "$PAKETVERWALTER" = "keiner" ]; then
+            meldung "[Dry run] Missing packages would only be named (no known package manager)."
         else
-            meldung "[Probelauf] Fehlende Pakete wuerden nur genannt (Paketverwaltung: $PAKETVERWALTER)."
+            meldung "[Dry run] Missing packages would only be named (package manager: $PAKETVERWALTER)."
         fi
         return 0
     fi
-    meldung "Programme werden geprueft ..."
+    meldung "Checking the programs ..."
 
-    # Pflicht: ohne Python 3 laeuft nichts.
+    # Mandatory: nothing runs without Python 3.
     if ! command -v python3 >/dev/null 2>&1; then
         paket_installieren python3 || true
     fi
     if ! command -v python3 >/dev/null 2>&1; then
         paket=$(paketname python3)
-        fehler "Python 3 fehlt. Bitte installieren: $(installationsbefehl) ${paket:-python3}"
+        fehler "Python 3 is missing. Please install it: $(installationsbefehl) ${paket:-python3}"
     fi
 
-    # Nuetzlich, aber nicht zwingend.
+    # Useful, but not strictly required.
     for befehl in curl ffmpeg; do
         command -v "$befehl" >/dev/null 2>&1 && continue
         paket_installieren "$befehl" || true
         command -v "$befehl" >/dev/null 2>&1 \
-            || warnung "'$befehl' fehlt. Ohne curl entfaellt das Nachladen, ohne ffmpeg die Umkodierung."
+            || warnung "'$befehl' is missing. Without curl there is no download, without ffmpeg no transcoding."
     done
 
     if [ "$KIOSK" != "ja" ]; then
-        meldung "Ohne Kiosk-Anzeige werden Chromium und die X11-Werkzeuge nicht benoetigt."
+        meldung "Without the kiosk display, Chromium and the X11 tools are not needed."
         return 0
     fi
 
-    # Nur fuer die Kiosk-Anzeige: X11-Werkzeuge und Chromium.
+    # Only for the kiosk display: X11 tools and Chromium.
     for befehl in xset xrandr ss flock scrot; do
         command -v "$befehl" >/dev/null 2>&1 && continue
         paket_installieren "$befehl" || true
         command -v "$befehl" >/dev/null 2>&1 \
-            || warnung "'$befehl' fehlt - die Kiosk-Anzeige arbeitet mit Einschraenkungen weiter."
+            || warnung "'$befehl' is missing - the kiosk display keeps working with limitations."
     done
 
     CHROMIUM=$(finde_chromium || true)
@@ -659,8 +661,8 @@ installiere_pakete() {
         CHROMIUM=$(finde_chromium || true)
     fi
     if [ -z "$CHROMIUM" ] && [ "$PAKETVERWALTER" = "apt" ]; then
-        # Auf aelteren Debian-Fassungen heisst das Paket anders.
-        meldung "Paket wird installiert: chromium-browser"
+        # On older Debian versions the package has a different name.
+        meldung "Installing package: chromium-browser"
         DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             chromium-browser >/dev/null 2>&1 || true
         CHROMIUM=$(finde_chromium || true)
@@ -668,22 +670,22 @@ installiere_pakete() {
     if [ -z "$CHROMIUM" ]; then
         KIOSK="nein"
         merke_fehlendes_paket "chromium"
-        warnung "Chromium ist nicht vorhanden - die Kiosk-Anzeige wird uebersprungen."
-        warnung "Nach dem Nachinstallieren einfach install.sh erneut starten."
+        warnung "Chromium is not present - the kiosk display is skipped."
+        warnung "After installing it, just run install.sh again."
     else
         meldung "Chromium: $CHROMIUM"
     fi
 }
 
-# ------------------------------------------------------------- Verzeichnisse -
+# ------------------------------------------------------------- directories ---
 
 lege_verzeichnisse_an() {
-    schritt "Verzeichnisse anlegen"
+    schritt "create directories"
     if [ "$TROCKEN" = "ja" ]; then
-        meldung "[Probelauf] Verzeichnisse wuerden angelegt: $ZIELVERZ $CONFVERZ $LOGVERZ $DATAVERZ"
+        meldung "[Dry run] These directories would be created: $ZIELVERZ $CONFVERZ $LOGVERZ $DATAVERZ"
         return 0
     fi
-    meldung "Verzeichnisse werden angelegt ..."
+    meldung "Creating the directories ..."
 
     mkdir -p "$ZIELVERZ" "$ZIELVERZ/bin" "$ZIELVERZ/web/public"
     mkdir -p "$CONFVERZ" "$LOGVERZ" "$DATAVERZ"
@@ -696,7 +698,7 @@ lege_verzeichnisse_an() {
     chmod 0750 "$CONFVERZ"
     chmod 0755 "$LOGVERZ" "$DATAVERZ"
 
-    # Protokolldatei der Kiosk-Anzeige vorbereiten
+    # Prepare the log file of the kiosk display
     if [ ! -f "$LOGVERZ/kiosk.log" ]; then
         : > "$LOGVERZ/kiosk.log"
     fi
@@ -705,17 +707,17 @@ lege_verzeichnisse_an() {
 }
 
 kopiere_programmdateien() {
-    schritt "Programmdateien kopieren"
+    schritt "copy program files"
     if [ "$TROCKEN" = "ja" ]; then
-        meldung "[Probelauf] Programmdateien wuerden nach $ZIELVERZ kopiert."
+        meldung "[Dry run] The program files would be copied to $ZIELVERZ."
         return 0
     fi
     if [ "$SKRIPTVERZ" = "$ZIELVERZ" ]; then
-        meldung "Programmdateien liegen bereits in $ZIELVERZ - kein Kopieren notwendig."
+        meldung "The program files are already in $ZIELVERZ - no copying needed."
         return 0
     fi
 
-    meldung "Programmdateien werden nach $ZIELVERZ kopiert ..."
+    meldung "Copying the program files to $ZIELVERZ ..."
     for verzeichnis in app scripts web config systemd; do
         if [ -d "$SKRIPTVERZ/$verzeichnis" ]; then
             mkdir -p "$ZIELVERZ/$verzeichnis"
@@ -733,8 +735,8 @@ kopiere_programmdateien() {
     find "$ZIELVERZ" -name '*.sh' -type f -exec chmod 0755 {} + 2>/dev/null || true
     find "$ZIELVERZ" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 
-    # app/streams.py legt anzeige.json neben die Anzeigeseite; dieses
-    # Verzeichnis muss dem Dienstbenutzer gehoeren.
+    # app/streams.py puts anzeige.json next to the display page; that
+    # directory has to belong to the service user.
     chown "$DIENSTBENUTZER:$BENUTZERGRUPPE" "$ZIELVERZ/web/public"
     chmod 0755 "$ZIELVERZ/web/public"
     if [ -f "$ZIELVERZ/web/public/anzeige.json" ]; then
@@ -755,69 +757,69 @@ ermittle_go2rtc_version() {
     case "${version:-}" in
         v[0-9]*) printf '%s' "$version" ;;
         *)
-            warnung "Neueste go2rtc-Version nicht ermittelbar - Rueckfall auf $GO2RTC_FESTVERSION."
+            warnung "The latest go2rtc version cannot be determined - falling back to $GO2RTC_FESTVERSION."
             printf '%s' "$GO2RTC_FESTVERSION"
             ;;
     esac
 }
 
-# Fragt nur, wenn eine Eingabe moeglich ist. Bei 'curl ... | sudo sh' gibt es
-# kein Terminal - dann wird geladen, weil genau das gewuenscht ist.
+# Asks only when input is possible. With 'curl ... | sudo sh' there is no
+# terminal - then it downloads, because that is exactly what was wanted.
 frage_ja() {
     if [ ! -t 0 ]; then
-        meldung "$1 (keine Eingabe moeglich - es wird geladen)"
+        meldung "$1 (no input possible - it is downloaded)"
         return 0
     fi
-    printf '[camgrid] %s [J/n] ' "$1"
+    printf '[camgrid] %s [Y/n] ' "$1"
     read -r antwort || antwort=""
     case "$antwort" in
-        n|N|nein|Nein|NEIN) return 1 ;;
+        n|N|no|No|NO|nein|Nein|NEIN) return 1 ;;
         *) return 0 ;;
     esac
 }
 
-# Laedt go2rtc von GitHub. Fuer macOS liegt dort ein ZIP-Archiv.
+# Downloads go2rtc from GitHub. For macOS it is a ZIP archive there.
 lade_go2rtc_aus_netz() {
     ziel="$1"
-    command -v curl >/dev/null 2>&1 || { warnung "curl fehlt - go2rtc kann nicht geladen werden."; return 1; }
+    command -v curl >/dev/null 2>&1 || { warnung "curl is missing - go2rtc cannot be downloaded."; return 1; }
     GO2RTC_VERSION=$(ermittle_go2rtc_version)
     zwischen="$ZIELVERZ/bin/go2rtc.neu.$$"
     rm -f "$zwischen" "$zwischen.zip"
 
     if [ "$SYSTEM" = "macos" ]; then
         quelle="https://github.com/$GO2RTC_REPO/releases/download/$GO2RTC_VERSION/$GO2RTC_DATEI.zip"
-        meldung "go2rtc $GO2RTC_VERSION wird geladen: $quelle"
+        meldung "Downloading go2rtc $GO2RTC_VERSION: $quelle"
         if ! curl -fsSL --max-time 300 -o "$zwischen.zip" "$quelle"; then
             rm -f "$zwischen.zip"
-            warnung "Download fehlgeschlagen: $quelle"
+            warnung "Download failed: $quelle"
             return 1
         fi
         if ! command -v unzip >/dev/null 2>&1; then
             rm -f "$zwischen.zip"
-            warnung "unzip fehlt - $GO2RTC_DATEI.zip kann nicht entpackt werden."
+            warnung "unzip is missing - $GO2RTC_DATEI.zip cannot be extracted."
             return 1
         fi
         entpackt="$ZIELVERZ/bin/entpackt.$$"
         mkdir -p "$entpackt"
         if ! unzip -o -q "$zwischen.zip" -d "$entpackt" 2>/dev/null; then
             rm -rf "$entpackt" "$zwischen.zip"
-            warnung "Archiv konnte nicht entpackt werden."
+            warnung "The archive could not be extracted."
             return 1
         fi
         gefunden=$(find "$entpackt" -type f -name 'go2rtc*' | head -n 1)
         if [ -z "$gefunden" ]; then
             rm -rf "$entpackt" "$zwischen.zip"
-            warnung "Im Archiv war kein go2rtc-Programm."
+            warnung "There was no go2rtc program in the archive."
             return 1
         fi
         mv -f "$gefunden" "$zwischen"
         rm -rf "$entpackt" "$zwischen.zip"
     else
         quelle="https://github.com/$GO2RTC_REPO/releases/download/$GO2RTC_VERSION/$GO2RTC_DATEI"
-        meldung "go2rtc $GO2RTC_VERSION wird geladen: $quelle"
+        meldung "Downloading go2rtc $GO2RTC_VERSION: $quelle"
         if ! curl -fsSL --max-time 300 -o "$zwischen" "$quelle"; then
             rm -f "$zwischen"
-            warnung "Download fehlgeschlagen: $quelle"
+            warnung "Download failed: $quelle"
             return 1
         fi
     fi
@@ -825,17 +827,17 @@ lade_go2rtc_aus_netz() {
     chmod 0755 "$zwischen"
     if ! "$zwischen" --version >/dev/null 2>&1; then
         rm -f "$zwischen"
-        warnung "Das geladene go2rtc laeuft auf diesem System nicht (falsche Architektur?)."
+        warnung "The downloaded go2rtc does not run on this system (wrong architecture?)."
         return 1
     fi
     mv -f "$zwischen" "$ziel"
     chmod 0755 "$ziel"
-    meldung "go2rtc installiert: $ziel"
+    meldung "go2rtc installed: $ziel"
     return 0
 }
 
 lade_go2rtc() {
-    schritt "go2rtc einrichten"
+    schritt "set up go2rtc"
     ziel="$ZIELVERZ/bin/go2rtc"
     mitgeliefert="$QUELLVERZ/vendor/go2rtc/$GO2RTC_DATEI"
     if [ -r "$QUELLVERZ/vendor/go2rtc/VERSION" ]; then
@@ -846,61 +848,61 @@ lade_go2rtc() {
 
     if [ "$TROCKEN" = "ja" ]; then
         if [ -r "$mitgeliefert" ]; then
-            meldung "[Probelauf] go2rtc $GO2RTC_VERSION aus dem Projekt kopieren: $mitgeliefert -> $ziel"
+            meldung "[Dry run] Copy go2rtc $GO2RTC_VERSION from the project: $mitgeliefert -> $ziel"
         else
-            meldung "[Probelauf] go2rtc fehlt im Projekt ($mitgeliefert) - es wuerde von GitHub geladen."
+            meldung "[Dry run] go2rtc is missing in the project ($mitgeliefert) - it would be downloaded from GitHub."
         fi
         GO2RTC_BEREIT="ja"
         return 0
     fi
 
     if [ -x "$ziel" ] && "$ziel" --version >/dev/null 2>&1; then
-        meldung "go2rtc ist bereits installiert."
+        meldung "go2rtc is already installed."
         GO2RTC_BEREIT="ja"
         return 0
     fi
 
-    # Der Regelfall auf Linux: das Programm liegt im Projekt und wird nur
-    # kopiert. Dadurch braucht die Installation kein Internet.
+    # The normal case on Linux: the program is part of the project and is only
+    # copied. That way the installation needs no internet connection.
     if [ -r "$mitgeliefert" ]; then
-        meldung "go2rtc $GO2RTC_VERSION wird aus dem Projekt installiert ($GO2RTC_DATEI) ..."
+        meldung "Installing go2rtc $GO2RTC_VERSION from the project ($GO2RTC_DATEI) ..."
         cp -f "$mitgeliefert" "$ziel"
         chmod 0755 "$ziel"
         if ! "$ziel" --version >/dev/null 2>&1; then
             rm -f "$ziel"
-            warnung "Das mitgelieferte go2rtc laeuft auf diesem System nicht (falsche Architektur?)."
+            warnung "The bundled go2rtc does not run on this system (wrong architecture?)."
         else
-            meldung "go2rtc installiert: $ziel"
+            meldung "go2rtc installed: $ziel"
             GO2RTC_BEREIT="ja"
             return 0
         fi
     else
-        warnung "go2rtc fuer dieses System liegt nicht im Projekt: $mitgeliefert"
+        warnung "go2rtc for this system is not part of the project: $mitgeliefert"
         if [ "$SYSTEM" = "macos" ]; then
-            warnung "Fuer macOS wird go2rtc nicht mitgeliefert (nur Linux und Windows)."
+            warnung "For macOS go2rtc is not bundled (only Linux and Windows)."
         fi
     fi
 
-    if frage_ja "go2rtc jetzt von GitHub laden ($GO2RTC_DATEI)?"; then
+    if frage_ja "Download go2rtc from GitHub now ($GO2RTC_DATEI)?"; then
         if lade_go2rtc_aus_netz "$ziel"; then
             GO2RTC_BEREIT="ja"
             return 0
         fi
     else
-        meldung "Kein Download - die Installation wird ohne Streaming-Dienst abgeschlossen."
+        meldung "No download - the installation is finished without the streaming service."
     fi
 
     GO2RTC_BEREIT="nein"
-    warnung "Ohne go2rtc gibt es keine Videobilder. Die Verwaltung laeuft trotzdem."
-    warnung "Nachtraeglich: Datei $GO2RTC_DATEI von https://github.com/$GO2RTC_REPO/releases"
-    warnung "nach $ziel legen, ausfuehrbar machen (chmod +x) und install.sh erneut starten."
+    warnung "Without go2rtc there are no video images. The admin interface still runs."
+    warnung "To add it later: get the file $GO2RTC_DATEI from https://github.com/$GO2RTC_REPO/releases,"
+    warnung "put it at $ziel, make it executable (chmod +x) and run install.sh again."
 }
 
 lade_weboberflaeche() {
-    schritt "Anzeigebausteine bereitstellen"
-    # video-rtc.js und video-stream.js liegen im Projekt und werden nur kopiert.
+    schritt "provide display components"
+    # video-rtc.js and video-stream.js are part of the project and are only copied.
     if [ "$TROCKEN" = "ja" ]; then
-        meldung "[Probelauf] Wiedergabe-Bausteine kopieren nach $ZIELVERZ/web/public"
+        meldung "[Dry run] Copy the playback components to $ZIELVERZ/web/public"
         return 0
     fi
     mkdir -p "$ZIELVERZ/web/public"
@@ -910,19 +912,19 @@ lade_weboberflaeche() {
             cp -f "$quelle" "$ZIELVERZ/web/public/$datei"
             chmod 0644 "$ZIELVERZ/web/public/$datei"
         elif [ -s "$ZIELVERZ/web/public/$datei" ]; then
-            warnung "$datei fehlt im Projekt - vorhandene Fassung bleibt."
+            warnung "$datei is missing in the project - the existing version stays."
         else
-            fehler "$datei fehlt im Projekt ($quelle) - die Anzeige wuerde kein Bild zeigen."
+            fehler "$datei is missing in the project ($quelle) - the display would show no image."
         fi
     done
-    meldung "Wiedergabe-Bausteine bereitgestellt."
+    meldung "Playback components provided."
 }
 
-# ------------------------------------------------------------- Konfiguration -
+# ------------------------------------------------------------ configuration -
 
-# Die Startkonfiguration wird von app/config.py erzeugt, damit es nur eine
-# Quelle fuer den Aufbau der Datei gibt. Schlaegt das fehl, schreibt das
-# Skript eine gleichwertige Minimalfassung selbst.
+# The initial configuration is created by app/config.py, so that there is only
+# one source for the layout of the file. If that fails, the script writes an
+# equivalent minimal version itself.
 erzeuge_konfiguration_python() {
     ziel="$1"
     python3 - "$ZIELVERZ" "$ziel" "$ADMINPORT" "$ANZEIGEPORT" <<'PYENDE'
@@ -986,8 +988,8 @@ erzeuge_konfiguration_notfall() {
     } > "$ziel"
 }
 
-# Setzt die festen Startzugangsdaten in einer frisch erzeugten Datei.
-# Vorhandene Konfigurationen werden nie angefasst.
+# Sets the fixed initial credentials in a freshly created file.
+# Existing configurations are never touched.
 setze_standardzugang() {
     ziel="$1"
     python3 - "$ziel" "$STANDARDBENUTZER" "$STANDARDPASSWORT" <<'PYENDE'
@@ -1006,35 +1008,35 @@ PYENDE
 }
 
 erzeuge_konfiguration() {
-    schritt "Konfiguration anlegen"
+    schritt "create configuration"
     if [ "$TROCKEN" = "ja" ]; then
-        meldung "[Probelauf] Konfiguration $CONFVERZ/config.json wuerde angelegt (vorhandene bleibt unveraendert)."
-        meldung "[Probelauf] Startzugang waere: $STANDARDBENUTZER / $STANDARDPASSWORT"
+        meldung "[Dry run] The configuration $CONFVERZ/config.json would be created (an existing one stays unchanged)."
+        meldung "[Dry run] The initial login would be: $STANDARDBENUTZER / $STANDARDPASSWORT"
         ADMINPASSWORT="$STANDARDPASSWORT"
         return 0
     fi
     ADMINPASSWORT=""
     ziel="$CONFVERZ/config.json"
     if [ -f "$ziel" ]; then
-        meldung "Konfiguration $ziel ist vorhanden und bleibt unveraendert."
+        meldung "The configuration $ziel exists and stays unchanged."
         if [ "$ADMINPORT" != "8080" ]; then
-            warnung "--port $ADMINPORT wird nicht uebernommen: der Port steht in der vorhandenen Konfiguration."
+            warnung "--port $ADMINPORT is ignored: the port is taken from the existing configuration."
         fi
         return 0
     fi
 
-    meldung "Startkonfiguration wird angelegt: $ziel"
+    meldung "Creating the initial configuration: $ziel"
     if ! erzeuge_konfiguration_python "$ziel" >/dev/null 2>&1 || [ ! -s "$ziel" ]; then
-        warnung "app/config.py konnte die Konfiguration nicht erzeugen - Minimalfassung wird geschrieben."
+        warnung "app/config.py could not create the configuration - a minimal version is written."
         rm -f "$ziel"
         erzeuge_konfiguration_notfall "$ziel"
     fi
-    [ -s "$ziel" ] || fehler "Konfiguration $ziel konnte nicht geschrieben werden."
+    [ -s "$ziel" ] || fehler "The configuration $ziel could not be written."
 
-    # Feste Startzugangsdaten erzwingen, unabhaengig davon, was app/config.py
-    # als Vorgabe mitbringt.
+    # Enforce the fixed initial credentials, no matter what app/config.py
+    # brings along as its default.
     if ! setze_standardzugang "$ziel" >/dev/null 2>&1; then
-        warnung "Startzugangsdaten konnten nicht gesetzt werden - bitte $ziel pruefen."
+        warnung "The initial credentials could not be set - please check $ziel."
     fi
     ADMINPASSWORT="$STANDARDPASSWORT"
 
@@ -1043,7 +1045,7 @@ erzeuge_konfiguration() {
 }
 
 richte_schluesselbund_ein() {
-    schritt "Schluesselbund pruefen"
+    schritt "check keyring"
     if [ "$TROCKEN" = "ja" ] || [ "$SYSTEM" != "linux" ]; then
         return 0
     fi
@@ -1051,11 +1053,11 @@ richte_schluesselbund_ein() {
     if [ -f "$ziel" ]; then
         chown "$DIENSTBENUTZER:$BENUTZERGRUPPE" "$ziel"
         chmod 0600 "$ziel"
-        meldung "Passwortdatei des Schluesselbunds gefunden - Rechte auf 600 gesetzt."
+        meldung "Password file of the keyring found - permissions set to 600."
     fi
 }
 
-# ------------------------------------------------------------------ Dienste --
+# ---------------------------------------------------------------- services --
 
 ermittle_python() {
     PYTHON3=$(command -v python3 2>/dev/null || true)
@@ -1065,11 +1067,11 @@ ermittle_python() {
 }
 
 installiere_dienste_systemd() {
-    meldung "systemd-Units werden installiert ..."
+    meldung "Installing the systemd units ..."
     for einheit in camgrid-admin.service camgrid-go2rtc.service; do
         if [ "$einheit" = "camgrid-go2rtc.service" ] && [ "$GO2RTC_BEREIT" != "ja" ]; then
-            meldung "camgrid-go2rtc wird uebersprungen (go2rtc fehlt)."
-            # Eine frueher installierte Unit wuerde sonst dauernd scheitern.
+            meldung "camgrid-go2rtc is skipped (go2rtc is missing)."
+            # A unit installed earlier would otherwise keep failing.
             if [ -f "$SYSTEMDVERZ/$einheit" ]; then
                 systemctl disable --now "$einheit" >/dev/null 2>&1 || true
                 rm -f "$SYSTEMDVERZ/$einheit"
@@ -1080,7 +1082,7 @@ installiere_dienste_systemd() {
         if [ ! -f "$quelle" ]; then
             quelle="$ZIELVERZ/systemd/$einheit"
         fi
-        [ -f "$quelle" ] || fehler "Unit-Datei fehlt: systemd/$einheit"
+        [ -f "$quelle" ] || fehler "Unit file is missing: systemd/$einheit"
         sed -e "s|__DIENSTBENUTZER__|$DIENSTBENUTZER|g" \
             -e "s|__DIENSTGRUPPE__|$BENUTZERGRUPPE|g" \
             -e "s|__PYTHON__|$PYTHON3|g" \
@@ -1091,14 +1093,14 @@ installiere_dienste_systemd() {
     systemctl daemon-reload
     if [ "$GO2RTC_BEREIT" = "ja" ]; then
         systemctl enable --now camgrid-go2rtc.service \
-            || warnung "camgrid-go2rtc laeuft nicht (pruefen: journalctl -u camgrid-go2rtc)."
+            || warnung "camgrid-go2rtc is not running (check with: journalctl -u camgrid-go2rtc)."
     fi
     systemctl enable --now camgrid-admin.service \
-        || warnung "camgrid-admin laeuft nicht (pruefen: journalctl -u camgrid-admin)."
+        || warnung "camgrid-admin is not running (check with: journalctl -u camgrid-admin)."
 }
 
-# launchd kennt kein ExecStartPre - deshalb startet go2rtc ueber
-# scripts/go2rtc-start.sh, das vorher go2rtc.yaml erzeugt.
+# launchd has no ExecStartPre - that is why go2rtc is started through
+# scripts/go2rtc-start.sh, which creates go2rtc.yaml beforehand.
 schreibe_launchd_plist() {
     label="$1"
     plist="$2"
@@ -1138,22 +1140,22 @@ launchd_laden() {
     plist="$2"
     kennung=$(id -u "$DIENSTBENUTZER" 2>/dev/null || printf '')
     if [ -z "$kennung" ]; then
-        warnung "Benutzerkennung von $DIENSTBENUTZER nicht ermittelbar - $label bitte von Hand laden."
+        warnung "The user id of $DIENSTBENUTZER cannot be determined - please load $label by hand."
         return 1
     fi
-    # Erst abmelden, damit ein erneuter Aufruf nicht scheitert (Idempotenz).
+    # Unload first, so that a repeated run does not fail (idempotency).
     sudo -u "$DIENSTBENUTZER" launchctl bootout "gui/$kennung/$label" >/dev/null 2>&1 || true
     sudo -u "$DIENSTBENUTZER" launchctl unload "$plist" >/dev/null 2>&1 || true
 
     if sudo -u "$DIENSTBENUTZER" launchctl bootstrap "gui/$kennung" "$plist" >/dev/null 2>&1; then
-        meldung "launchd-Dienst geladen: $label"
+        meldung "launchd service loaded: $label"
         return 0
     fi
     if sudo -u "$DIENSTBENUTZER" launchctl load -w "$plist" >/dev/null 2>&1; then
-        meldung "launchd-Dienst geladen (load -w): $label"
+        meldung "launchd service loaded (load -w): $label"
         return 0
     fi
-    warnung "$label konnte nicht geladen werden. Von Hand (als $DIENSTBENUTZER):"
+    warnung "$label could not be loaded. By hand (as $DIENSTBENUTZER):"
     warnung "  launchctl bootstrap gui/\$(id -u) $plist"
     return 1
 }
@@ -1166,7 +1168,7 @@ installiere_dienste_launchd() {
     adminplist="$agentverz/de.camgrid.admin.plist"
     go2rtcplist="$agentverz/de.camgrid.go2rtc.plist"
 
-    meldung "launchd-Dienste werden eingerichtet: $agentverz"
+    meldung "Setting up the launchd services: $agentverz"
     schreibe_launchd_plist "de.camgrid.admin" "$adminplist" "$LOGVERZ/admin.log" \
         "$PYTHON3" "$ZIELVERZ/app/server.py" "--config" "$CONFVERZ/config.json"
     launchd_laden "de.camgrid.admin" "$adminplist" || true
@@ -1176,19 +1178,19 @@ installiere_dienste_launchd() {
             "/bin/sh" "$ZIELVERZ/scripts/go2rtc-start.sh"
         launchd_laden "de.camgrid.go2rtc" "$go2rtcplist" || true
     else
-        meldung "de.camgrid.go2rtc wird uebersprungen (go2rtc fehlt)."
+        meldung "de.camgrid.go2rtc is skipped (go2rtc is missing)."
         rm -f "$go2rtcplist"
     fi
 }
 
 installiere_dienste() {
-    schritt "Dienste einrichten"
+    schritt "set up services"
     ermittle_python
     if [ "$TROCKEN" = "ja" ]; then
         case "$DIENSTART" in
-            systemd) meldung "[Probelauf] systemd-Dienste wuerden eingerichtet und gestartet." ;;
-            launchd) meldung "[Probelauf] launchd-Dienste in ~/Library/LaunchAgents wuerden eingerichtet." ;;
-            *)       meldung "[Probelauf] Keine Dienstverwaltung - Start muesste von Hand erfolgen." ;;
+            systemd) meldung "[Dry run] The systemd services would be set up and started." ;;
+            launchd) meldung "[Dry run] The launchd services in ~/Library/LaunchAgents would be set up." ;;
+            *)       meldung "[Dry run] No service manager - it would have to be started by hand." ;;
         esac
         return 0
     fi
@@ -1197,35 +1199,35 @@ installiere_dienste() {
         systemd) installiere_dienste_systemd ;;
         launchd) installiere_dienste_launchd ;;
         *)
-            warnung "Keine Dienstverwaltung vorhanden - es wird nichts automatisch gestartet."
-            meldung "Von Hand starten (im Vordergrund):"
+            warnung "No service manager present - nothing is started automatically."
+            meldung "Start it by hand (in the foreground):"
             meldung "  $PYTHON3 $ZIELVERZ/app/dienst.py --mit-server --config $CONFVERZ/config.json"
             ;;
     esac
 }
 
-# ------------------------------------------------------------------ Autostart -
+# --------------------------------------------------------------- autostart --
 
 schreibe_autostart() {
-    schritt "Autostart einrichten"
+    schritt "set up autostart"
     if [ "$SYSTEM" != "linux" ]; then
         return 0
     fi
     if [ "$TROCKEN" = "ja" ]; then
         if [ "$KIOSK" = "ja" ]; then
-            meldung "[Probelauf] Kiosk-Autostart in ~/.config/autostart wuerde angelegt."
+            meldung "[Dry run] The kiosk autostart in ~/.config/autostart would be created."
         else
-            meldung "[Probelauf] Kein Kiosk-Autostart (abgeschaltet oder keine Oberflaeche)."
+            meldung "[Dry run] No kiosk autostart (switched off or no desktop)."
         fi
         return 0
     fi
     if [ "$HAT_GRAFIK" != "ja" ] && [ "$KIOSK" != "ja" ]; then
-        meldung "Ohne grafische Oberflaeche wird kein Autostart angelegt."
-        # Reste einer frueheren Installation mit Bildschirm aufraeumen.
+        meldung "Without a graphical desktop no autostart is created."
+        # Clean up leftovers of an earlier installation that had a screen.
         for alt_datei in camgrid-kiosk.desktop camgrid-keyring.desktop; do
             if [ -f "$BENUTZERHEIM/.config/autostart/$alt_datei" ]; then
                 rm -f "$BENUTZERHEIM/.config/autostart/$alt_datei"
-                meldung "Alter Autostart-Eintrag entfernt: $alt_datei"
+                meldung "Old autostart entry removed: $alt_datei"
             fi
         done
         return 0
@@ -1241,17 +1243,17 @@ schreibe_autostart() {
     if [ "$KIOSK" = "nein" ]; then
         if [ -f "$kioskdatei" ]; then
             rm -f "$kioskdatei"
-            meldung "Kiosk-Autostart entfernt."
+            meldung "Kiosk autostart removed."
         else
-            meldung "Kiosk-Autostart wird nicht angelegt."
+            meldung "The kiosk autostart is not created."
         fi
     else
-        meldung "Autostart der Anzeige: $kioskdatei"
+        meldung "Autostart of the display: $kioskdatei"
         {
             printf '[Desktop Entry]\n'
             printf 'Type=Application\n'
-            printf 'Name=CamGrid Anzeige\n'
-            printf 'Comment=Startet die Kamera-Anzeigewand im Kiosk-Modus\n'
+            printf 'Name=CamGrid Display\n'
+            printf 'Comment=Starts the camera wall in kiosk mode\n'
             printf 'Exec=%s/scripts/kiosk.sh\n' "$ZIELVERZ"
             printf 'Terminal=false\n'
             printf 'X-GNOME-Autostart-enabled=true\n'
@@ -1260,12 +1262,12 @@ schreibe_autostart() {
         chmod 0644 "$kioskdatei"
     fi
 
-    meldung "Autostart des Schluesselbunds: $keyringdatei"
+    meldung "Autostart of the keyring: $keyringdatei"
     {
         printf '[Desktop Entry]\n'
         printf 'Type=Application\n'
-        printf 'Name=CamGrid Schluesselbund\n'
-        printf 'Comment=Entsperrt den GNOME-Schluesselbund ohne Tastatureingabe\n'
+        printf 'Name=CamGrid Keyring\n'
+        printf 'Comment=Unlocks the GNOME keyring without keyboard input\n'
         printf 'Exec=%s/scripts/keyring.sh\n' "$ZIELVERZ"
         printf 'Terminal=false\n'
         printf 'X-GNOME-Autostart-enabled=true\n'
@@ -1274,30 +1276,30 @@ schreibe_autostart() {
     chmod 0644 "$keyringdatei"
 }
 
-# ------------------------------------------------------------------- sudoers -
+# ----------------------------------------------------------------- sudoers --
 
-# Die Regel erlaubt dem Dienstbenutzer nur das Neustarten der eigenen Dienste
-# und einen Neustart des Geraets - beides aus dem Dashboard heraus.
+# The rule only allows the service user to restart its own services and to
+# reboot the device - both from the dashboard.
 schreibe_sudoers() {
-    schritt "sudoers-Regel anlegen"
+    schritt "create sudoers rule"
     if [ "$TROCKEN" = "ja" ]; then
         if [ "$SYSTEM" = "linux" ] && [ "$DIENSTART" = "systemd" ]; then
-            meldung "[Probelauf] sudoers-Regel $SUDOERSDATEI wuerde angelegt."
+            meldung "[Dry run] The sudoers rule $SUDOERSDATEI would be created."
         else
-            meldung "[Probelauf] Keine sudoers-Regel notwendig (nur bei systemd sinnvoll)."
+            meldung "[Dry run] No sudoers rule needed (only useful with systemd)."
         fi
         return 0
     fi
     if [ "$SYSTEM" != "linux" ] || [ "$DIENSTART" != "systemd" ]; then
-        meldung "Keine sudoers-Regel notwendig (nur bei systemd sinnvoll)."
+        meldung "No sudoers rule needed (only useful with systemd)."
         return 0
     fi
     if ! command -v visudo >/dev/null 2>&1; then
-        warnung "visudo fehlt - die sudoers-Regel wird nicht angelegt."
-        warnung "Ohne sie kann das Dashboard die Dienste nicht selbst neu starten."
+        warnung "visudo is missing - the sudoers rule is not created."
+        warnung "Without it the dashboard cannot restart the services itself."
         return 0
     fi
-    meldung "sudoers-Regel wird angelegt: $SUDOERSDATEI"
+    meldung "Creating the sudoers rule: $SUDOERSDATEI"
 
     sicherung=""
     if [ -f "$SUDOERSDATEI" ]; then
@@ -1307,7 +1309,7 @@ schreibe_sudoers() {
 
     neu="$SUDOERSDATEI.neu.$$"
     {
-        printf '# CamGrid - von install.sh erzeugt, nicht von Hand aendern.\n'
+        printf '# CamGrid - created by install.sh, do not edit by hand.\n'
         printf 'Cmnd_Alias CAMGRID_DIENSTE = '
         erster="ja"
         for pfad in /usr/bin/systemctl /bin/systemctl; do
@@ -1335,20 +1337,20 @@ schreibe_sudoers() {
         rm -f "$neu"
         if [ -n "$sicherung" ]; then
             mv -f "$sicherung" "$SUDOERSDATEI"
-            fehler "sudoers-Regel ist fehlerhaft - vorherige Fassung wurde wiederhergestellt."
+            fehler "The sudoers rule is faulty - the previous version was restored."
         fi
-        fehler "sudoers-Regel ist fehlerhaft und wurde nicht uebernommen."
+        fehler "The sudoers rule is faulty and was not applied."
     fi
 
-    # Gesamtpruefung, damit ein defektes sudo sofort auffaellt
+    # Check the whole file, so that a broken sudo shows up right away
     if ! visudo -c >/dev/null 2>&1; then
         rm -f "$SUDOERSDATEI"
-        fehler "Gesamtpruefung von sudoers fehlgeschlagen - Regel wurde wieder entfernt."
+        fehler "The overall check of sudoers failed - the rule was removed again."
     fi
-    meldung "sudoers-Regel geprueft (visudo -c)."
+    meldung "sudoers rule checked (visudo -c)."
 }
 
-# ------------------------------------------------------------ Zusammenfassung -
+# ------------------------------------------------------------------ summary --
 
 ermittle_ip() {
     adresse=""
@@ -1364,13 +1366,13 @@ ermittle_ip() {
         adresse=$(ip route get 1.1.1.1 2>/dev/null | awk '/src/ {print $7; exit}' || true)
     fi
     if [ -z "${adresse:-}" ]; then
-        adresse="<ip-adresse>"
+        adresse="<ip-address>"
     fi
     printf '%s' "$adresse"
 }
 
 lies_port() {
-    # lies_port <schluessel> <ersatzwert>
+    # lies_port <key> <fallback>
     wert=$(sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p" \
         "$CONFVERZ/config.json" 2>/dev/null | head -n 1 || true)
     case "${wert:-}" in
@@ -1380,7 +1382,7 @@ lies_port() {
 }
 
 zusammenfassung() {
-    schritt "Zusammenfassung"
+    schritt "summary"
     ip=$(ermittle_ip)
     port=$(lies_port admin_port "$ADMINPORT")
     ANZEIGEPORT=$(lies_port go2rtc_port "$ANZEIGEPORT")
@@ -1388,64 +1390,64 @@ zusammenfassung() {
     printf '\n'
     printf '========================================================\n'
     if [ "$TROCKEN" = "ja" ]; then
-        printf ' CamGrid %s - Probelauf beendet (nichts geaendert)\n' "$PROJEKTVERSION"
+        printf ' CamGrid %s - dry run finished (nothing changed)\n' "$PROJEKTVERSION"
     else
-        printf ' CamGrid %s - Installation abgeschlossen\n' "$PROJEKTVERSION"
+        printf ' CamGrid %s - installation finished\n' "$PROJEKTVERSION"
     fi
     printf '========================================================\n'
     printf '\n'
-    printf ' Adressen\n'
-    printf '   Verwaltung : http://%s:%s\n' "$ip" "$port"
-    printf '   Anzeige    : http://%s:%s/?monitor=1\n' "$ip" "$ANZEIGEPORT"
+    printf ' Addresses\n'
+    printf '   Admin   : http://%s:%s\n' "$ip" "$port"
+    printf '   Display : http://%s:%s/?monitor=1\n' "$ip" "$ANZEIGEPORT"
     printf '\n'
-    printf ' Zugangsdaten\n'
+    printf ' Credentials\n'
     if [ -n "${ADMINPASSWORT:-}" ]; then
-        printf '   Benutzer   : %s\n' "$STANDARDBENUTZER"
-        printf '   Passwort   : %s\n' "$ADMINPASSWORT"
-        printf '   >>> Das ist die bekannte Vorgabe. Bitte SOFORT nach dem ersten\n'
-        printf '   >>> Anmelden in der Verwaltung ein eigenes Passwort setzen.\n'
+        printf '   User     : %s\n' "$STANDARDBENUTZER"
+        printf '   Password : %s\n' "$ADMINPASSWORT"
+        printf '   >>> This is the well-known default. Please set your own password\n'
+        printf '   >>> in the admin interface IMMEDIATELY after the first login.\n'
     else
-        printf '   Unveraendert (vorhandene Konfiguration wurde beibehalten).\n'
-        printf '   Vorgabe bei einer frischen Installation: %s / %s\n' "$STANDARDBENUTZER" "$STANDARDPASSWORT"
+        printf '   Unchanged (the existing configuration was kept).\n'
+        printf '   Default for a fresh installation: %s / %s\n' "$STANDARDBENUTZER" "$STANDARDPASSWORT"
     fi
     printf '\n'
-    printf ' Pfade\n'
-    printf '   Programm       : %s\n' "$ZIELVERZ"
-    printf '   Konfiguration  : %s/config.json\n' "$CONFVERZ"
-    printf '   Protokolle     : %s\n' "$LOGVERZ"
-    printf '   Laufzeitdaten  : %s (go2rtc.yaml)\n' "$DATAVERZ"
-    printf '   Dienstbenutzer : %s\n' "$DIENSTBENUTZER"
+    printf ' Paths\n'
+    printf '   Program        : %s\n' "$ZIELVERZ"
+    printf '   Configuration  : %s/config.json\n' "$CONFVERZ"
+    printf '   Logs           : %s\n' "$LOGVERZ"
+    printf '   Runtime data   : %s (go2rtc.yaml)\n' "$DATAVERZ"
+    printf '   Service user   : %s\n' "$DIENSTBENUTZER"
     printf '\n'
     if [ -n "$FEHLENDE_PAKETE" ]; then
-        printf ' Fehlende Pakete bitte nachinstallieren\n'
+        printf ' Please install the missing packages\n'
         printf '   %s%s\n' "$(installationsbefehl)" "$FEHLENDE_PAKETE"
-        printf '   Danach install.sh einfach erneut starten.\n'
+        printf '   After that, just run install.sh again.\n'
         printf '\n'
     fi
     if [ "$GO2RTC_BEREIT" != "ja" ]; then
-        printf ' Ohne Streaming-Dienst installiert\n'
-        printf '   go2rtc fehlt. Datei %s von\n' "$GO2RTC_DATEI"
-        printf '   https://github.com/%s/releases holen, nach\n' "$GO2RTC_REPO"
-        printf '   %s/bin/go2rtc legen, chmod +x setzen und install.sh erneut starten.\n' "$ZIELVERZ"
+        printf ' Installed without the streaming service\n'
+        printf '   go2rtc is missing. Get the file %s from\n' "$GO2RTC_DATEI"
+        printf '   https://github.com/%s/releases, put it at\n' "$GO2RTC_REPO"
+        printf '   %s/bin/go2rtc, run chmod +x on it and start install.sh again.\n' "$ZIELVERZ"
         printf '\n'
     fi
-    printf ' Naechste Schritte\n'
-    printf '   1. Verwaltung im Browser oeffnen, Passwort aendern, Kameras eintragen.\n'
-    printf '   2. Monitore, Ausgaenge und Kachelraster festlegen.\n'
+    printf ' Next steps\n'
+    printf '   1. Open the admin interface in a browser, change the password, add cameras.\n'
+    printf '   2. Set the monitors, the outputs and the tile grid.\n'
     if [ "$SYSTEM" = "macos" ]; then
-        printf '   3. Anzeige im Vollbild oeffnen (kein Autostart auf macOS):\n'
+        printf '   3. Open the display full screen (no autostart on macOS):\n'
         printf '      open -a "Google Chrome" --args --kiosk "http://127.0.0.1:%s/?monitor=1"\n' "$ANZEIGEPORT"
-        printf '      oder Safari oeffnen und mit Strg+Cmd+F auf Vollbild schalten.\n'
+        printf '      or open Safari and switch to full screen with Ctrl+Cmd+F.\n'
     elif [ "$KIOSK" = "ja" ]; then
-        printf '   3. Geraet neu starten (sudo reboot) - die Anzeige startet dann selbst.\n'
-        printf '      Sofort pruefen: %s/scripts/kiosk.sh --neustart\n' "$ZIELVERZ"
+        printf '   3. Reboot the device (sudo reboot) - the display then starts on its own.\n'
+        printf '      Check it right away: %s/scripts/kiosk.sh --neustart\n' "$ZIELVERZ"
     else
-        printf '   3. Keine Kiosk-Anzeige eingerichtet.\n'
-        printf '      Anzeige im Netz: http://%s:%s/?monitor=1\n' "$ip" "$ANZEIGEPORT"
-        printf '      Von Hand starten: %s/scripts/kiosk.sh\n' "$ZIELVERZ"
+        printf '   3. No kiosk display was set up.\n'
+        printf '      Display over the network: http://%s:%s/?monitor=1\n' "$ip" "$ANZEIGEPORT"
+        printf '      Start it by hand: %s/scripts/kiosk.sh\n' "$ZIELVERZ"
     fi
     printf '\n'
-    printf ' Dienste pruefen\n'
+    printf ' Check the services\n'
     case "$DIENSTART" in
         systemd)
             printf '   systemctl status camgrid-admin camgrid-go2rtc\n'
@@ -1461,12 +1463,12 @@ zusammenfassung() {
             ;;
     esac
     printf '\n'
-    printf ' Entfernen\n'
+    printf ' Remove\n'
     printf '   sudo %s/uninstall.sh\n' "$ZIELVERZ"
     printf '\n'
 }
 
-# ------------------------------------------------------------------- Ablauf --
+# --------------------------------------------------------------------- flow --
 
 erkenne_system
 pruefe_root
