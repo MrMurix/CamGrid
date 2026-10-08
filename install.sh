@@ -1274,6 +1274,34 @@ schreibe_autostart() {
     } > "$keyringdatei"
     chown "$DIENSTBENUTZER:$BENUTZERGRUPPE" "$keyringdatei"
     chmod 0644 "$keyringdatei"
+
+    schreibe_labwc_autostart
+}
+
+# labwc - the Wayland session of Raspberry Pi OS - does not read
+# ~/.config/autostart at all. It runs ~/.config/labwc/autostart as a shell
+# script instead, so without this the display never starts on such a device.
+schreibe_labwc_autostart() {
+    command -v labwc >/dev/null 2>&1 || return 0
+
+    labwcverz="$BENUTZERHEIM/.config/labwc"
+    labwcdatei="$labwcverz/autostart"
+    mkdir -p "$labwcverz"
+    [ -f "$labwcdatei" ] || : > "$labwcdatei"
+
+    # Drop the lines of an earlier installation, then write them fresh.
+    if grep -q "$ZIELVERZ/scripts/" "$labwcdatei" 2>/dev/null; then
+        grep -v "$ZIELVERZ/scripts/" "$labwcdatei" > "$labwcdatei.neu" 2>/dev/null \
+            && mv "$labwcdatei.neu" "$labwcdatei"
+    fi
+    printf '%s/scripts/keyring.sh &\n' "$ZIELVERZ" >> "$labwcdatei"
+    if [ "$KIOSK" = "ja" ]; then
+        printf '%s/scripts/kiosk.sh &\n' "$ZIELVERZ" >> "$labwcdatei"
+    fi
+
+    chown "$DIENSTBENUTZER:$BENUTZERGRUPPE" "$labwcverz" "$labwcdatei" 2>/dev/null || true
+    chmod 0644 "$labwcdatei"
+    meldung "labwc session found - autostart also written to $labwcdatei"
 }
 
 # ----------------------------------------------------------------- sudoers --

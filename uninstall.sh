@@ -132,6 +132,13 @@ entferne_autostart() {
                 printf '[camgrid] Removed: %s\n' "$heim/.config/autostart/$datei"
             fi
         done
+        # The Wayland session (labwc) keeps its own autostart file.
+        labwcdatei="$heim/.config/labwc/autostart"
+        if [ -f "$labwcdatei" ] && grep -q "/camgrid/scripts/" "$labwcdatei" 2>/dev/null; then
+            grep -v "/camgrid/scripts/" "$labwcdatei" > "$labwcdatei.neu" 2>/dev/null \
+                && mv "$labwcdatei.neu" "$labwcdatei"
+            printf '[camgrid] Cleaned up: %s\n' "$labwcdatei"
+        fi
     done
 }
 

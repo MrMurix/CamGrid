@@ -9,7 +9,9 @@
 # Lessons learned that are implemented here on purpose:
 #   - After a system start a waiting time is required, otherwise Chromium hangs
 #     in state D (disk sleep) on the SD card and shows empty white windows.
-#   - --use-angle=gl is mandatory, otherwise the video images are green/purple.
+#   - On X11 --use-angle=gl is mandatory, otherwise the video images are
+#     green and purple. Under Wayland the same flag keeps the GPU process
+#     from starting at all, so there Chromium keeps its own default.
 #   - 4K runs on these devices only at 30 Hz and overloads the Pi; the default
 #     is therefore 1920x1080 at 60 Hz.
 #   - The timestamp in the address keeps Chromium from showing an old version
@@ -43,6 +45,9 @@ PIDDATEI=""
 TMPVERZ=""
 PLANDATEI=""
 CHROMIUM=""
+GRAFIKFLAG=""            # decided at the start, see grafik_waehlen
+GRAFIKWECHSEL="nein"     # the fallback is only tried once
+NEUSTARTGESAMT="0"
 PIDZUORDNUNG="ja"
 FENSTERANZAHL="0"
 
@@ -511,7 +516,7 @@ starte_fenster() {
         --autoplay-policy=no-user-gesture-required \
         --password-store=basic \
         --disable-features=Translate \
-        --use-angle=gl \
+        $GRAFIKFLAG \
         --window-position="$x,0" \
         --window-size="$breite,$hoehe" \
         "http://127.0.0.1:$ANZEIGEPORT/?monitor=$nr&v=$stempel" \
@@ -521,6 +526,40 @@ starte_fenster() {
     eval "PID_$nr=\$neuepid"
     eval "FEHLER_$nr=0"
     protokoll "Monitor $nr: window started (PID $neuepid, position ${x},0, size ${breite}x${hoehe})."
+}
+
+# Chromium's graphics backend depends on the session. On X11 the videos come
+# out green and purple unless ANGLE uses desktop GL. Under Wayland (labwc on
+# Raspberry Pi OS, reached through Xwayland) that very flag makes the GPU
+# process die on start: the window stays black and the page is never loaded.
+grafik_waehlen() {
+    _wl="${WAYLAND_DISPLAY:-}"
+    if [ -z "$_wl" ] && [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+        for _sock in "$XDG_RUNTIME_DIR"/wayland-*; do
+            if [ -S "$_sock" ]; then
+                _wl="$_sock"
+                break
+            fi
+        done
+    fi
+    if [ -n "$_wl" ] || [ "${XDG_SESSION_TYPE:-}" = "wayland" ]; then
+        GRAFIKFLAG=""
+        protokoll "Wayland session - Chromium keeps its own graphics backend."
+    else
+        GRAFIKFLAG="--use-angle=gl"
+        protokoll "X11 session - Chromium starts with --use-angle=gl."
+    fi
+}
+
+# If no window comes up, the other backend is worth a try.
+grafik_umschalten() {
+    if [ -n "$GRAFIKFLAG" ]; then
+        GRAFIKFLAG=""
+        protokoll "WARNING No window comes up - trying again without --use-angle=gl."
+    else
+        GRAFIKFLAG="--use-angle=gl"
+        protokoll "WARNING No window comes up - trying again with --use-angle=gl."
+    fi
 }
 
 starte_alle_fenster() {
@@ -642,6 +681,11 @@ ueberwache() {
                 eval "FEHLER_$nr=\$fehl"
                 protokoll "WARNING Monitor $nr: $grund (failure $fehl of $MAXFEHLVERSUCHE)."
                 if [ "$fehl" -ge "$MAXFEHLVERSUCHE" ]; then
+                    NEUSTARTGESAMT=$((NEUSTARTGESAMT + 1))
+                    if [ "$NEUSTARTGESAMT" -ge 2 ] && [ "$GRAFIKWECHSEL" = "nein" ]; then
+                        grafik_umschalten
+                        GRAFIKWECHSEL="ja"
+                    fi
                     protokoll "Monitor $nr is being restarted."
                     beende_einzelfenster "$nr" "$pid"
                     starte_fenster "$nr" "$x" "$breite" "$hoehe"
@@ -688,6 +732,7 @@ PROFILBASIS="${HOME:-/tmp}/.config/camgrid"
 mkdir -p "$PROFILBASIS" 2>/dev/null || true
 
 warte_auf_x
+grafik_waehlen
 warte_nach_systemstart
 warte_auf_dienst
 

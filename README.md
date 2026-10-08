@@ -179,7 +179,8 @@ The browser test drives Chrome or Edge headless, expects a running
 |---|---|
 | Camera found, but no video | Wrong user, password or stream path. Press **Check** in the camera list — it tells you what it found. |
 | Camera answers, but port 554 is closed | Then it cannot do RTSP. CamGrid looks for an MJPEG stream over HTTP instead; if that fails, enter the camera's stream URL under **Full address** in the camera panel. |
-| Picture looks green or purple | Chromium needs `--use-angle=gl`; `scripts/kiosk.sh` sets it. Add it if you start the browser yourself. |
+| Picture looks green or purple | On an X11 session Chromium needs `--use-angle=gl`; `scripts/kiosk.sh` sets it. Add it if you start the browser yourself. |
+| Screen stays black on a Wayland desktop | The same `--use-angle=gl` keeps the GPU process from starting there. `scripts/kiosk.sh` recognises the session and leaves the flag out; if a window still stays black, the watchdog switches the backend by itself after two attempts. |
 | Monitors stay white | `tail /var/log/camgrid/kiosk.log`. The watchdog restarts empty windows within a minute. |
 | Display stutters | Use the sub stream instead of the main stream (the scan suggests it) and set the monitors to 1920×1080 at 60 Hz. |
 | "no response" although there is a picture | Reachability is probed on port 554. Cameras serving RTSP on another port do not show up there. |
@@ -188,8 +189,13 @@ The browser test drives Chrome or Edge headless, expects a running
 
 These cost real time in the predecessor project and are handled here already:
 
-- **Chromium needs `--use-angle=gl`.** With the default `gles` the video comes
-  out green and purple.
+- **Chromium needs `--use-angle=gl` — but only on X11.** With the default
+  `gles` the video comes out green and purple there. Under Wayland (labwc on
+  Raspberry Pi OS) the very same flag makes the GPU process die on start and
+  the screen stays black, so the kiosk script picks the backend per session.
+- **labwc ignores `~/.config/autostart`.** The Wayland session of Raspberry
+  Pi OS runs `~/.config/labwc/autostart` as a shell script instead, so the
+  installer writes the entries there as well.
 - **4K only runs at 30 Hz** on these screens. Monitors therefore default to
   1920×1080 at 60 Hz — the picture does not get worse, because the camera
   streams are smaller, but the machine has far less work.
